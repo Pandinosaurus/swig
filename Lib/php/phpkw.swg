@@ -3,10 +3,13 @@
  * ----------------------------------------------------------------------------- */
 
 /* Keyword (case insensitive) */
-#define PHPKW(x) %keywordwarn("'" `x` "' is a PHP keyword, renaming to 'c_" `x` "'",sourcefmt="%(lower)s",rename="c_%s") `x`
+#define PHPKW(x) %keywordwarn("'" `x` "' is a PHP keyword",sourcefmt="%(lower)s",rename="c_%s") `x`
+
+/* Keyword, except ok as a function */
+#define PHPKW_ok_as_function(x) %keywordwarn("'" `x` "' is a PHP keyword",%$not %$isfunction,sourcefmt="%(lower)s",rename="c_%s") `x`
 
 /* Class (case insensitive) */
-#define PHPCN(x) %keywordwarn("'" `x` "' is a PHP reserved class name, renaming to 'c_" `x` "'",%$isclass,sourcefmt="%(lower)s",rename="c_%s") `x`
+#define PHPCN(x) %keywordwarn("'" `x` "' is a PHP reserved class name",%$isclass,sourcefmt="%(lower)s",rename="c_%s") `x`
 
 /* Constant (case insensitive) */
 #define PHPBN1a(x) %namewarn(%warningmsg(SWIGWARN_PARSE_BUILTIN_NAME, "enum conflicts with a built-in constant '"`x`"' in PHP"),%$isenumitem,sourcefmt="%(lower)s") `x`
@@ -22,7 +25,7 @@
  PHPBN2a(X); PHPBN2b(X)
 %enddef
 
-#define PHPFN(x) %keywordwarn("'" `x` "' is a PHP built-in function, renaming to 'c_" `x` "'",sourcefmt="%(lower)s",%$isfunction,%$not %$ismember,rename="c_%s") `x`
+#define PHPFN(x) %keywordwarn("'" `x` "' is a PHP built-in function",sourcefmt="%(lower)s",%$isfunction,%$not %$ismember,rename="c_%s") `x`
 
 /* From: http://php.net/manual/en/reserved.keywords.php
  * "You cannot use any of the following words as constants, class names,
@@ -84,6 +87,11 @@ PHPKW(while);
 PHPKW(xor);
 PHPKW(yield);
 
+/* PHP 8.1 made `readonly` a keyword, but (unlike any other keyword it seems)
+ * it may still be used as a function name.
+ */
+PHPKW_ok_as_function(readonly);
+
 // Compile-time "magic" constants
 // From: http://php.net/manual/en/reserved.keywords.php
 // also at: http://php.net/manual/en/language.constants.predefined.php
@@ -95,6 +103,7 @@ PHPKW(__function__);
 PHPKW(__line__);
 PHPKW(__method__);
 PHPKW(__namespace__);
+PHPKW(__property__); // as of PHP 8.4
 PHPKW(__trait__);
 
 /* We classify these as built-in names since they conflict, but PHP still runs */
@@ -113,6 +122,8 @@ PHPBN2(PHP_MINOR_VERSION);
 PHPBN2(PHP_RELEASE_VERSION);
 PHPBN2(PHP_VERSION_ID);
 PHPBN2(PHP_EXTRA_VERSION);
+PHPBN2(PHP_BUILD_DATE); // Since 8.5.0
+PHPBN2(PHP_BUILD_PROVIDER); // Since 8.5.0
 PHPBN2(PHP_ZTS);
 PHPBN2(PHP_DEBUG);
 PHPBN2(PHP_MAXPATHLEN);
@@ -131,6 +142,7 @@ PHPBN2(PEAR_EXTENSION_DIR);
 PHPBN2(PHP_EXTENSION_DIR);
 PHPBN2(PHP_PREFIX);
 PHPBN2(PHP_BINDIR);
+PHPBN2(PHP_SBINDIR); // Since 8.4.0
 PHPBN2(PHP_BINARY);
 PHPBN2(PHP_MANDIR);
 PHPBN2(PHP_LIBDIR);
@@ -157,6 +169,7 @@ PHPBN2(E_DEPRECATED);
 PHPBN2(E_USER_DEPRECATED);
 PHPBN2(E_ALL);
 PHPBN2(E_STRICT);
+PHPBN2(ZEND_VM_KIND); // Since 8.5.0
 PHPBN2(__COMPILER_HALT_OFFSET__);
 // TRUE, FALSE, NULL are listed on the same page, but are actually
 // case-insensitive, whereas all the other constants listed there seem to be
@@ -518,6 +531,7 @@ PHPBN2(PHP_OUTPUT_HANDLER_DISABLED);
 PHPBN2(PHP_OUTPUT_HANDLER_FINAL);
 PHPBN2(PHP_OUTPUT_HANDLER_FLUSH);
 PHPBN2(PHP_OUTPUT_HANDLER_FLUSHABLE);
+PHPBN2(PHP_OUTPUT_HANDLER_PROCESSED); // Since 8.4.0
 PHPBN2(PHP_OUTPUT_HANDLER_REMOVABLE);
 PHPBN2(PHP_OUTPUT_HANDLER_STARTED);
 PHPBN2(PHP_OUTPUT_HANDLER_STDFLAGS);
@@ -650,6 +664,9 @@ PHPCN(numeric); // As of PHP 7.0 (currently works but reserved)
 /* http://php.net/manual/en/migration71.incompatible.php#migration71.incompatible.invalid-class-names */
 PHPCN(iterable); // As of PHP 7.1
 PHPCN(void); // As of PHP 7.1
+/* https://www.php.net/manual/en/reserved.other-reserved-words.php */
+PHPCN(never); // As of PHP 8.1
+PHPCN(array); // As of PHP 8.5
 /* Predefined interfaces and classes, introduced in PHP 7.0.0 */
 PHPCN(arithmeticerror);
 PHPCN(assertionerror);
@@ -658,6 +675,28 @@ PHPCN(error);
 PHPCN(throwable);
 PHPCN(parseerror);
 PHPCN(typeerror);
+/* Predefined interfaces and classes, introduced in PHP 8 */
+PHPCN(attribute); // As of PHP 8.0
+PHPCN(internaliterator); // As of PHP 8.0
+PHPCN(stringable); // As of PHP 8.0
+PHPCN(unhandledmatcherror); // As of PHP 8.0
+PHPCN(valueerror); // As of PHP 8.0
+PHPCN(weakmap); // As of PHP 8.0
+PHPCN(backedenum); // As of PHP 8.1
+PHPCN(fiber); // As of PHP 8.1
+PHPCN(fibererror); // As of PHP 8.1
+PHPCN(returntypewillchange); // As of PHP 8.1
+PHPCN(unitenum); // As of PHP 8.1
+PHPCN(allowdynamicproperties); // As of PHP 8.2
+PHPCN(sensitiveparameter); // As of PHP 8.2
+PHPCN(sensitiveparametervalue); // As of PHP 8.2
+PHPCN(override); // As of PHP 8.3
+PHPCN(deprecated); // As of PHP 8.4
+PHPCN(requestparsebodyexception); // As of PHP 8.4
+PHPCN(roundingmode); // As of PHP 8.4
+PHPCN(streambucket); // As of PHP 8.4
+PHPCN(delayedtargetvalidation); // As of PHP 8.5
+PHPCN(nodiscard); // As of PHP 8.5
 /* From extensions (which of these are actually predefined depends which
  * extensions are loaded by default). */
 PHPCN(xmlwriter);
@@ -713,6 +752,15 @@ PHPCN(reflectionclass);
 PHPCN(reflectionobject);
 PHPCN(reflectionproperty);
 PHPCN(reflectionextension);
+PHPCN(reflectionattribute); // As of PHP 8.0
+PHPCN(reflectionuniontype); // As of PHP 8.0
+PHPCN(reflectionenum); // As of PHP 8.1
+PHPCN(reflectionenumbackedcase); // As of PHP 8.1
+PHPCN(reflectionenumunitcase); // As of PHP 8.1
+PHPCN(reflectionfiber); // As of PHP 8.1
+PHPCN(reflectionintersectiontype); // As of PHP 8.1
+PHPCN(propertyhooktype); // As of PHP 8.4
+PHPCN(reflectionconstant); // As of PHP 8.4
 PHPCN(domexception);
 PHPCN(domstringlist);
 PHPCN(domnamelist);
@@ -744,12 +792,23 @@ PHPCN(domentityreference);
 PHPCN(domprocessinginstruction);
 PHPCN(domstringextend);
 PHPCN(domxpath);
+PHPCN(domchildnode); // As of PHP 8.0
+PHPCN(domparentnode); // As of PHP 8.0
 PHPCN(xmlreader);
 PHPCN(sqlitedatabase);
 PHPCN(sqliteresult);
 PHPCN(sqliteunbuffered);
 PHPCN(sqliteexception);
 PHPCN(datetime);
+PHPCN(dateerror); // As of PHP 8.3
+PHPCN(dateexception); // As of PHP 8.3
+PHPCN(dateinvalidoperationexception); // As of PHP 8.3
+PHPCN(dateinvalidtimezoneexception); // As of PHP 8.3
+PHPCN(datemalformedintervalstringexception); // As of PHP 8.3
+PHPCN(datemalformedperiodstringexception); // As of PHP 8.3
+PHPCN(datemalformedstringexception); // As of PHP 8.3
+PHPCN(dateobjecterror); // As of PHP 8.3
+PHPCN(daterangeerror); // As of PHP 8.3
 
 /* Built-in PHP functions (incomplete). */
 /* Includes Array Functions - http://php.net/manual/en/ref.array.php */
@@ -757,6 +816,8 @@ PHPCN(datetime);
 PHPFN(__halt_compiler);
 PHPFN(acos);
 PHPFN(array);
+PHPFN(array_all); // As of PHP 8.4
+PHPFN(array_any); // As of PHP 8.4
 PHPFN(array_change_key_case);
 PHPFN(array_chunk);
 PHPFN(array_column);
@@ -770,14 +831,19 @@ PHPFN(array_diff_ukey);
 PHPFN(array_fill);
 PHPFN(array_fill_keys);
 PHPFN(array_filter);
+PHPFN(array_find); // As of PHP 8.4
+PHPFN(array_find_key); // As of PHP 8.4
+PHPFN(array_first); // As of PHP 8.5
 PHPFN(array_flip);
 PHPFN(array_intersect);
 PHPFN(array_intersect_assoc);
 PHPFN(array_intersect_key);
 PHPFN(array_intersect_uassoc);
 PHPFN(array_intersect_ukey);
+PHPFN(array_is_list); // As of PHP 8.1
 PHPFN(array_key_exists);
 PHPFN(array_keys);
+PHPFN(array_last); // As of PHP 8.5
 PHPFN(array_map);
 PHPFN(array_merge);
 PHPFN(array_merge_recursive);
@@ -869,6 +935,7 @@ PHPFN(unset); // "Language construct"
 PHPFN(usort);
 
 #undef PHPKW
+#undef PHPKW_ok_as_function
 #undef PHPBN1a
 #undef PHPBN1b
 #undef PHPBN1

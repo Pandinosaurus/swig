@@ -1,10 +1,10 @@
 /* -----------------------------------------------------------------------------
- * This file is part of SWIG, which is licensed as a whole under version 3 
+ * This file is part of SWIG, which is licensed as a whole under version 3
  * (or any later version) of the GNU General Public License. Some additional
  * terms also apply to certain portions of SWIG. The full details of the SWIG
  * license and copyrights can be found in the LICENSE and COPYRIGHT files
  * included with the SWIG source code as distributed by the SWIG developers
- * and at http://www.swig.org/legal.html.
+ * and at https://www.swig.org/legal.html.
  *
  * emit.cxx
  *
@@ -64,8 +64,6 @@ void emit_parameter_variables(ParmList *l, Wrapper *f) {
   Swig_cargs(f, l);
 
   /* Attach typemaps to parameters */
-  /*  Swig_typemap_attach_parms("ignore",l,f); */
-
   Swig_typemap_attach_parms("default", l, f);
   Swig_typemap_attach_parms("arginit", l, f);
 
@@ -95,38 +93,17 @@ void emit_parameter_variables(ParmList *l, Wrapper *f) {
 }
 
 /* -----------------------------------------------------------------------------
- * emit_attach_parmmaps()
+ * emit_attach_parm_typemaps()
  *
  * Attach the standard parameter related typemaps.
  * ----------------------------------------------------------------------------- */
 
-void emit_attach_parmmaps(ParmList *l, Wrapper *f) {
+void emit_attach_parm_typemaps(ParmList *l, Wrapper *f) {
   Swig_typemap_attach_parms("in", l, f);
   Swig_typemap_attach_parms("typecheck", l, 0);
   Swig_typemap_attach_parms("argout", l, f);
   Swig_typemap_attach_parms("check", l, f);
   Swig_typemap_attach_parms("freearg", l, f);
-
-  {
-    /* This is compatibility code to deal with the deprecated "ignore" typemap */
-    Parm *p = l;
-    Parm *np;
-    while (p) {
-      String *tm = Getattr(p, "tmap:in");
-      if (tm && checkAttribute(p, "tmap:in:numinputs", "0")) {
-	Printv(f->code, tm, "\n", NIL);
-	np = Getattr(p, "tmap:in:next");
-	while (p && (p != np)) {
-	  /*	  Setattr(p,"ignore","1");    Deprecate */
-	  p = nextSibling(p);
-	}
-      } else if (tm) {
-	p = Getattr(p, "tmap:in:next");
-      } else {
-	p = nextSibling(p);
-      }
-    }
-  }
 
   /* Perform a sanity check on "in" and "freearg" typemaps.  These
      must exactly match to avoid chaos.  If a mismatch occurs, we
@@ -137,44 +114,34 @@ void emit_attach_parmmaps(ParmList *l, Wrapper *f) {
     while (p) {
       npin = Getattr(p, "tmap:in:next");
 
-      /*
-         if (Getattr(p,"tmap:ignore")) {
-         npin = Getattr(p,"tmap:ignore:next");
-         } else if (Getattr(p,"tmap:in")) {
-         npin = Getattr(p,"tmap:in:next");
-         }
-       */
-
       if (Getattr(p, "tmap:freearg")) {
-	npfreearg = Getattr(p, "tmap:freearg:next");
-	if (npin != npfreearg) {
-	  while (p != npin) {
-	    Delattr(p, "tmap:freearg");
-	    Delattr(p, "tmap:freearg:next");
-	    p = nextSibling(p);
-	  }
-	}
+        npfreearg = Getattr(p, "tmap:freearg:next");
+        if (npin != npfreearg) {
+          while (p != npin) {
+            Delattr(p, "tmap:freearg");
+            Delattr(p, "tmap:freearg:next");
+            p = nextSibling(p);
+          }
+        }
       }
       p = npin;
     }
   }
 
   /* Check for variable length arguments with no input typemap.
-     If no input is defined, we set this to ignore and print a
-     message.
+     If no input is defined, we print a message.
    */
   {
     Parm *p = l;
     Parm *lp = 0;
     while (p) {
       if (!checkAttribute(p, "tmap:in:numinputs", "0")) {
-	lp = p;
-	p = Getattr(p, "tmap:in:next");
-	continue;
+        lp = p;
+        p = Getattr(p, "tmap:in:next");
+        continue;
       }
       if (SwigType_isvarargs(Getattr(p, "type"))) {
-	Swig_warning(WARN_LANG_VARARGS, input_file, line_number, "Variable length arguments discarded.\n");
-	Setattr(p, "tmap:in", "");
+        Swig_warning(WARN_LANG_VARARGS, input_file, line_number, "Variable length arguments discarded.\n");
       }
       lp = 0;
       p = nextSibling(p);
@@ -184,18 +151,18 @@ void emit_attach_parmmaps(ParmList *l, Wrapper *f) {
     if (lp) {
       p = lp;
       while (p) {
-	if (SwigType_isvarargs(Getattr(p, "type"))) {
-	  // Mark the head of the ParmList that it has varargs
-	  Setattr(l, "emit:varargs", lp);
-//Printf(stdout, "setting emit:varargs %s ... %s +++ %s\n", Getattr(l, "emit:varargs"), Getattr(l, "type"), Getattr(p, "type"));
-	  break;
-	}
-	p = nextSibling(p);
+        if (SwigType_isvarargs(Getattr(p, "type"))) {
+          // Mark the head of the ParmList that it has varargs
+          Setattr(l, "emit:varargs", lp);
+          // Printf(stdout, "setting emit:varargs %s ... %s +++ %s\n", Getattr(l, "emit:varargs"), Getattr(l, "type"), Getattr(p, "type"));
+          break;
+        }
+        p = nextSibling(p);
       }
     }
   }
 
-  /* 
+  /*
    * An equivalent type can be used in the typecheck typemap for SWIG to detect the overloading of equivalent
    * target language types. This is primarily for the smartptr feature, where a pointer and a smart pointer
    * are seen as equivalent types in the target language.
@@ -205,25 +172,59 @@ void emit_attach_parmmaps(ParmList *l, Wrapper *f) {
     while (p) {
       String *tm = Getattr(p, "tmap:typecheck");
       if (tm) {
-	String *equivalent = Getattr(p, "tmap:typecheck:equivalent");
-	if (equivalent) {
-	  String *precedence = Getattr(p, "tmap:typecheck:precedence");
-	  if (precedence && Strcmp(precedence, "0") != 0)
-	    Swig_error(Getfile(tm), Getline(tm), "The 'typecheck' typemap for %s contains an 'equivalent' attribute for a 'precedence' that is not set to SWIG_TYPECHECK_POINTER or 0.\n", SwigType_str(Getattr(p, "type"), 0));
-	  SwigType *cpt = Swig_cparse_type(equivalent);
-	  if (cpt) {
-	    Setattr(p, "equivtype", cpt);
-	    Delete(cpt);
-	  } else {
-	    Swig_error(Getfile(tm), Getline(tm), "Invalid type (%s) in 'equivalent' attribute in 'typecheck' typemap for type %s.\n", equivalent, SwigType_str(Getattr(p, "type"), 0));
-	  }
-	}
-	p = Getattr(p, "tmap:typecheck:next");
+        String *equivalent = Getattr(p, "tmap:typecheck:equivalent");
+        if (equivalent) {
+          String *precedence = Getattr(p, "tmap:typecheck:precedence");
+          if (precedence && Strcmp(precedence, "0") != 0)
+            Swig_error(Getfile(tm),
+                       Getline(tm),
+                       "The 'typecheck' typemap for %s contains an 'equivalent' attribute for a 'precedence' that is not set to SWIG_TYPECHECK_POINTER or 0.\n",
+                       SwigType_str(Getattr(p, "type"), 0));
+          SwigType *cpt = Swig_cparse_type(equivalent);
+          if (cpt) {
+            Setattr(p, "equivtype", cpt);
+            Delete(cpt);
+          } else {
+            Swig_error(Getfile(tm),
+                       Getline(tm),
+                       "Invalid type (%s) in 'equivalent' attribute in 'typecheck' typemap for type %s.\n",
+                       equivalent,
+                       SwigType_str(Getattr(p, "type"), 0));
+          }
+        }
+        p = Getattr(p, "tmap:typecheck:next");
       } else {
-	p = nextSibling(p);
+        p = nextSibling(p);
       }
     }
   }
+}
+
+/* -----------------------------------------------------------------------------
+ * emit_ignored_in_typemaps()
+ *
+ * Emit into 'code' the code of the "in" typemaps with numinputs=0, whose parameters take no target language argument,
+ * for the parameters from 'p' up to the next parameter that takes one, which is returned.  A target language module
+ * calls this in the loop that converts the arguments, before converting each one and once more after the last one, so
+ * that the code comes in parameter order and can use the arguments converted before it:
+ *
+ *   for (i = 0, p = l; i < num_arguments; i++) {
+ *     p = emit_ignored_in_typemaps(p, code);
+ *     ... emit the "in" typemap for p into code ...
+ *     p = Getattr(p, "tmap:in:next");
+ *   }
+ *   p = emit_ignored_in_typemaps(p, code);
+ *
+ * A loop that runs until there are no more parameters, rather than for the number of arguments, only needs the first
+ * call, followed by a check for the end of the parameters.
+ * ----------------------------------------------------------------------------- */
+
+Parm *emit_ignored_in_typemaps(Parm *p, String *code) {
+  while (p && checkAttribute(p, "tmap:in:numinputs", "0")) {
+    Printv(code, Getattr(p, "tmap:in"), "\n", NIL);
+    p = Getattr(p, "tmap:in:next");
+  }
+  return p;
 }
 
 /* -----------------------------------------------------------------------------
@@ -259,6 +260,148 @@ int emit_num_arguments(ParmList *parms) {
 }
 
 /* -----------------------------------------------------------------------------
+ * emit_output_summary()
+ *
+ * Works out which values a wrapped function returns to the target language.
+ *
+ * The first is the function's own return value, unless the 'out' typemap declares
+ * numoutputs=0 to suppress it. Each matched 'argout' typemap then does one of three
+ * things, according to its attributes:
+ *
+ *   numoutputs=1   - appends one value to those returned so far. This is the default
+ *                    and what the typemaps.i OUTPUT family does.
+ *   numoutputs=0   - returns nothing. Used by a typemap that writes back through the
+ *                    parameter, or that only turns an error code into an exception.
+ *   overwrite=1    - returns one value, discarding everything returned before it,
+ *                    including the function return value. Used by a typemap that
+ *                    assigns $result rather than appending to it. A 'container'
+ *                    attribute on it names the container it assigns, which the argout
+ *                    typemaps after it then append into.
+ *
+ * The parameter list to analyse is passed in so that a caller working on a copy of
+ * the parameters, such as one that has attached its own typemaps to the copy, gets
+ * back parameters from that same copy.
+ *
+ * 'warn_container_mismatch' says whether to warn when the 'argout' typemaps do not
+ * all build the same container. A target language passes false when the interface
+ * has supplied the type of the values returned by hand, as it then already knows
+ * what the warning would be telling it.
+ *
+ * Sets the following attributes on n:
+ *
+ *   wrap:returnsurvives  - set when the function return value is one of the values
+ *                          returned to the target language
+ *   wrap:outputparms     - List of the parameters contributing a returned value, in
+ *                          the order the values are returned
+ *   wrap:outputcontainer - the container the argout typemaps append into, from their
+ *                          'container' attribute, or "unknown" when they disagree
+ *   wrap:outputcontainerbuilt
+ *                        - set when an overwriting argout typemap builds the container
+ *                          itself, so that a single value is in it too. A container
+ *                          that is only appended into holds a single value bare.
+ * ----------------------------------------------------------------------------- */
+
+void emit_output_summary(Node *n, ParmList *parms, bool warn_container_mismatch) {
+  Parm *p;
+  List *outputs = NewList();
+  String *container = 0;
+  String *clashing_container = 0;
+  int container_built = 0;
+  int returnsurvives;
+
+  /* A void function has no return value to return and an 'out' typemap declaring
+     numoutputs=0 says not to return the one there is. */
+  returnsurvives = !Equal(Getattr(n, "type"), "void");
+  if (returnsurvives && Getattr(n, "tmap:out:numoutputs"))
+    returnsurvives = GetInt(n, "tmap:out:numoutputs") > 0;
+
+  for (p = parms; p; p = nextSibling(p)) {
+    int numoutputs;
+    if (!Getattr(p, "tmap:argout:match_type"))
+      continue;
+
+    numoutputs = Getattr(p, "tmap:argout:numoutputs") ? GetInt(p, "tmap:argout:numoutputs") : 1;
+
+    String *tm_container = Getattr(p, "tmap:argout:container");
+
+    if (GetFlag(p, "tmap:argout:overwrite")) {
+      /* Everything returned so far is thrown away by this typemap. */
+      Clear(outputs);
+      returnsurvives = 0;
+      Delete(container);
+      container = numoutputs > 0 ? Copy(tm_container) : 0;
+      container_built = container ? 1 : 0;
+      Delete(clashing_container);
+      clashing_container = 0;
+    } else if (numoutputs > 0) {
+      const char *want = tm_container ? Char(tm_container) : "list";
+      if (!container) {
+        container = NewString(want);
+      } else if (!Equal(container, want) && !clashing_container) {
+        clashing_container = NewString(want);
+      }
+    }
+
+    if (numoutputs > 0)
+      Append(outputs, p);
+  }
+
+  if (returnsurvives)
+    SetFlag(n, "wrap:returnsurvives");
+  else
+    Delattr(n, "wrap:returnsurvives");
+
+  Setattr(n, "wrap:outputparms", outputs);
+  Delete(outputs);
+
+  if (clashing_container) {
+    if (warn_container_mismatch)
+      Swig_warning(WARN_TYPEMAP_ARGOUT_CONTAINER_MISMATCH,
+                   Getfile(n),
+                   Getline(n),
+                   "The argout typemaps for '%s' append into different containers, '%s' and '%s', so the type of the values returned cannot be worked out "
+                   "and a catch-all type is used for the return type instead. "
+                   "Check the container attribute in each argout typemap used by this function, noting that it defaults to 'list'.\n",
+                   SwigType_namestr(Getattr(n, "name")),
+                   container,
+                   clashing_container);
+    Setattr(n, "wrap:outputcontainer", "unknown");
+  } else if (container) {
+    Setattr(n, "wrap:outputcontainer", container);
+  } else {
+    Delattr(n, "wrap:outputcontainer");
+  }
+
+  if (container_built && !clashing_container)
+    SetFlag(n, "wrap:outputcontainerbuilt");
+  else
+    Delattr(n, "wrap:outputcontainerbuilt");
+
+  Delete(container);
+  Delete(clashing_container);
+}
+
+/* -----------------------------------------------------------------------------
+ * emit_isvoid_special_variables()
+ *
+ * Substitutes the $isvoid and $isvoidresult special variables in the wrapper code.
+ *
+ * $isvoid says whether the C++ return type is void. $isvoidresult says whether the
+ * wrapper has a return value for the 'argout' typemaps to append to, which a void
+ * return does not and neither does a return value that an 'out' typemap has
+ * suppressed with numoutputs=0.
+ *
+ * Pass n as 0 where there is no 'out' typemap to consult, such as a director
+ * method, and $isvoidresult is then the same as $isvoid.
+ * ----------------------------------------------------------------------------- */
+
+void emit_isvoid_special_variables(Node *n, String *code, bool isvoid) {
+  bool isvoidresult = isvoid || (n && checkAttribute(n, "tmap:out:numoutputs", "0"));
+  Replaceall(code, "$isvoidresult", isvoidresult ? "1" : "0");
+  Replaceall(code, "$isvoid", isvoid ? "1" : "0");
+}
+
+/* -----------------------------------------------------------------------------
  * emit_num_required()
  *
  * Computes the number of required arguments.  This function is safe for
@@ -278,18 +421,18 @@ int emit_num_required(ParmList *parms) {
       p = Getattr(p, "tmap:in:next");
     } else {
       if (Getattr(p, "tmap:default"))
-	break;
+        break;
       if (Getattr(p, "value")) {
-	if (!first_default_arg)
-	  first_default_arg = p;
-	if (compactdefargs)
-	  break;
+        if (!first_default_arg)
+          first_default_arg = p;
+        if (compactdefargs)
+          break;
       }
       nargs += GetInt(p, "tmap:in:numinputs");
       if (Getattr(p, "tmap:in")) {
-	p = Getattr(p, "tmap:in:next");
+        p = Getattr(p, "tmap:in:next");
       } else {
-	p = nextSibling(p);
+        p = nextSibling(p);
       }
     }
   }
@@ -300,16 +443,16 @@ int emit_num_required(ParmList *parms) {
     p = first_default_arg;
     while (p) {
       if (Getattr(p, "tmap:in") && checkAttribute(p, "tmap:in:numinputs", "0")) {
-	p = Getattr(p, "tmap:in:next");
+        p = Getattr(p, "tmap:in:next");
       } else {
-	if (!Getattr(p, "value") && (!Getattr(p, "tmap:default"))) {
-	  Swig_error(Getfile(p), Getline(p), "Non-optional argument '%s' follows an optional argument.\n", Getattr(p, "name"));
-	}
-	if (Getattr(p, "tmap:in")) {
-	  p = Getattr(p, "tmap:in:next");
-	} else {
-	  p = nextSibling(p);
-	}
+        if (!Getattr(p, "value") && (!Getattr(p, "tmap:default"))) {
+          Swig_error(Getfile(p), Getline(p), "Non-optional argument '%s' follows an optional argument.\n", Getattr(p, "name"));
+        }
+        if (Getattr(p, "tmap:in")) {
+          p = Getattr(p, "tmap:in:next");
+        } else {
+          p = nextSibling(p);
+        }
       }
     }
   }
@@ -329,7 +472,7 @@ int emit_num_required(ParmList *parms) {
  * emit_isvarargs()
  *
  * Checks if a ParmList is a parameter list containing varargs.
- * This function requires emit_attach_parmmaps to have been called beforehand.
+ * This function requires emit_attach_parm_typemaps to have been called beforehand.
  * ----------------------------------------------------------------------------- */
 
 int emit_isvarargs(ParmList *p) {
@@ -352,8 +495,8 @@ bool emit_isvarargs_function(Node *n) {
   if (over) {
     for (Node *sibling = over; sibling; sibling = Getattr(sibling, "sym:nextSibling")) {
       if (ParmList_has_varargs(Getattr(sibling, "parms"))) {
-	has_varargs = true;
-	break;
+        has_varargs = true;
+        break;
       }
     }
   } else {
@@ -366,7 +509,7 @@ bool emit_isvarargs_function(Node *n) {
  * void emit_mark_vararg_parms()
  *
  * Marks the vararg parameters which are to be ignored.
- * Vararg parameters are marked as ignored if there is no 'in' varargs (...) 
+ * Vararg parameters are marked as ignored if there is no 'in' varargs (...)
  * typemap.
  * ----------------------------------------------------------------------------- */
 
@@ -375,7 +518,7 @@ void emit_mark_varargs(ParmList *l) {
   while (p) {
     if (SwigType_isvarargs(Getattr(p, "type")))
       if (!Getattr(p, "tmap:in"))
-	Setattr(p, "varargs:ignore", "1");
+        Setattr(p, "varargs:ignore", "1");
     p = nextSibling(p);
   }
 }
@@ -411,9 +554,8 @@ int emit_action_code(Node *n, String *wrappercode, String *eaction) {
   if (tm)
     tm = Copy(tm);
   if ((tm) && Len(tm) && (Strcmp(tm, "1") != 0)) {
-    if (Strstr(tm, "$")) {
+    if (Strchr(tm, '$')) {
       Swig_replace_special_variables(n, parentNode(n), tm);
-      Replaceall(tm, "$function", eaction); // deprecated
       Replaceall(tm, "$action", eaction);
     }
     Printv(wrappercode, tm, "\n", NIL);
@@ -426,9 +568,31 @@ int emit_action_code(Node *n, String *wrappercode, String *eaction) {
 }
 
 /* -----------------------------------------------------------------------------
+ * emit_throws_locals()
+ *
+ * Declares the local variables of the 'throws' typemap for exception 'ep' in its catch block, as the typemap is looked
+ * up without a wrapper to declare them in.
+ * ----------------------------------------------------------------------------- */
+
+static void emit_throws_locals(String *eaction, Parm *ep) {
+  for (Parm *lp = Getattr(ep, "tmap:throws:locals"); lp; lp = nextSibling(lp)) {
+    String *name = Getattr(lp, "name");
+    if (Len(name) > 0) {
+      SwigType *type = Getattr(lp, "type");
+      SwigType *alttype = SwigType_alttype(type, 1);
+      String *value = Getattr(lp, "value");
+      String *decl = SwigType_str(alttype ? alttype : type, name);
+      Printv(eaction, "\n", decl, value ? " = " : "", value ? value : "", ";\n", NIL);
+      Delete(decl);
+      Delete(alttype);
+    }
+  }
+}
+
+/* -----------------------------------------------------------------------------
  * int emit_action()
  *
- * Emits the call to the wrapped function. 
+ * Emits the call to the wrapped function.
  * Adds in exception specification exception handling and %exception code.
  * ----------------------------------------------------------------------------- */
 String *emit_action(Node *n) {
@@ -447,12 +611,12 @@ String *emit_action(Node *n) {
       c = Char(t);
       tok = strtok(c, ",");
       while (tok) {
-	String *fname = NewString(tok);
-	Setfile(fname, Getfile(n));
-	Setline(fname, Getline(n));
-	Swig_fragment_emit(fname);
-	Delete(fname);
-	tok = strtok(NULL, ",");
+        String *fname = NewString(tok);
+        Setfile(fname, Getfile(n));
+        Setline(fname, Getline(n));
+        Swig_fragment_emit(fname);
+        Delete(fname);
+        tok = strtok(NULL, ",");
       }
       Delete(t);
     }
@@ -519,23 +683,17 @@ String *emit_action(Node *n) {
         } else {
           Printf(eaction, " catch(%s) {", SwigType_str(et, "&_e"));
         }
+        emit_throws_locals(eaction, ep);
         Printv(eaction, em, "\n", NIL);
         Printf(eaction, "}");
       } else {
-	Swig_warning(WARN_TYPEMAP_THROW, Getfile(n), Getline(n), "No 'throws' typemap defined for exception type '%s'\n", SwigType_str(Getattr(ep, "type"), 0));
+        Swig_warning(WARN_TYPEMAP_THROW, Getfile(n), Getline(n), "No 'throws' typemap defined for exception type '%s'\n", SwigType_str(Getattr(ep, "type"), 0));
         unknown_catch = 1;
       }
     }
     if (unknown_catch && !has_varargs) {
       Printf(eaction, " catch(...) {\nthrow;\n}");
     }
-  }
-
-  /* Look for except typemap (Deprecated) */
-  tm = Swig_typemap_lookup("except", n, Swig_cresult_name(), 0);
-  if (tm) {
-    Setattr(n, "feature:except", tm);
-    tm = 0;
   }
 
   /* emit the except feature code */

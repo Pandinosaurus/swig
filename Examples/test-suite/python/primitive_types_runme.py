@@ -83,6 +83,13 @@ class PyTest (TestDirector):
     def ident(self, x):
         return x
 
+    # The warning for const char * and const char *& warning is suppressed:
+    #  Warning 473: Returning a reference, pointer or pointer wrapper in a director method is not recommended.
+    # ident_extra_ref is a hack to add an extra reference in order to avoid returning a pointer to deleted memory.
+    def ident_extra_ref(self, x):
+        self.extra_ref = x
+        return x
+
     def vval_bool(self, x): return self.ident(x)
 
     def vval_schar(self, x): return self.ident(x)
@@ -111,9 +118,9 @@ class PyTest (TestDirector):
 
     def vval_char(self, x): return self.ident(x)
 
-    def vval_pchar(self, x): return self.ident(x)
+    def vval_pchar(self, x): return self.ident_extra_ref(x)
 
-    def vval_pcharc(self, x): return self.ident(x)
+    def vval_pcharc(self, x): return self.ident_extra_ref(x)
 
     def vval_pint(self, x): return self.ident(x)
 
@@ -151,9 +158,9 @@ class PyTest (TestDirector):
 
     def vref_char(self, x): return self.ident(x)
 
-    def vref_pchar(self, x): return self.ident(x)
+    def vref_pchar(self, x): return self.ident_extra_ref(x)
 
-    def vref_pcharc(self, x): return self.ident(x)
+    def vref_pcharc(self, x): return self.ident_extra_ref(x)
 
     def vref_pint(self, x): return self.ident(x)
 
@@ -434,9 +441,6 @@ if v != 4:
 # Check the bounds for converting various types
 #
 
-# ctypes not available until 2.5
-if sys.version_info[0:2] <= (2, 4):
-    sys.exit(0)
 import ctypes
 
 # Get the minimum and maximum values that fit in signed char, short, int, long, and long long
@@ -471,9 +475,6 @@ minllong = -overllong
 maxllong = overllong - 1
 maxullong = 2 * maxllong + 1
 
-# Make sure Python 2's sys.maxint is the same as the maxlong we calculated
-if sys.version_info[0] <= 2 and maxlong != sys.maxint:
-    raise RuntimeError("sys.maxint is not the maximum value of a signed long")
 
 def checkType(t, e, val, delta):
     """t = Test object, e = type name (e.g. ulong), val = max or min allowed value, delta = +1 for max, -1 for min"""
@@ -593,6 +594,5 @@ def checkType(name, maxfunc, maxval, minfunc, minval, echofunc):
         raise RuntimeError("bad " + name + " typemap")
 
 # sys.maxsize is the largest value supported by Py_ssize_t, which should be the same as ptrdiff_t
-if sys.version_info[0:2] >= (2, 6):
-    checkType("ptrdiff_t", get_ptrdiff_max, sys.maxsize,           get_ptrdiff_min, -(sys.maxsize + 1), ptrdiff_echo)
-    checkType("size_t",    get_size_max,    (2 * sys.maxsize) + 1, get_size_min,    0,                  size_echo)
+checkType("ptrdiff_t", get_ptrdiff_max, sys.maxsize,           get_ptrdiff_min, -(sys.maxsize + 1), ptrdiff_echo)
+checkType("size_t",    get_size_max,    (2 * sys.maxsize) + 1, get_size_min,    0,                  size_echo)

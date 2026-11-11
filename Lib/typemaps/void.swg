@@ -10,7 +10,7 @@
     %argument_fail(res, "$type", $symname, $argnum); 
   }
 }
-%typemap(freearg) void * "";
+%typemap(freearg) void * ""
 
 %typemap(in,noblock=1) void * const& ($*ltype temp = 0, int res) {
   res = SWIG_ConvertPtr($input, %as_voidptrptr(&temp), 0, $disown);
@@ -19,15 +19,15 @@
   }
   $1 =  &temp;
 }
-%typemap(freearg) void * const& "";
+%typemap(freearg) void * const& ""
 
 
 /* out */
 
 #if defined(VOID_Object)
-%typemap(out,noblock=1) void { $result = VOID_Object; }
+%typemap(out,noblock=1,numoutputs=0) void { $result = VOID_Object; }
 #else
-%typemap(out,noblock=1) void {}
+%typemap(out,noblock=1,numoutputs=0) void {}
 #endif
 
 /* varin */
@@ -43,7 +43,7 @@
 
 /* typecheck */
 
-%typecheck(SWIG_TYPECHECK_VOIDPTR, noblock=1) void *
+%typecheck(SWIG_TYPECHECK_VOIDPTR, noblock=1) void *, void *const&
 {
   void *ptr = 0;
   int res = SWIG_ConvertPtr($input, &ptr, 0, 0);
@@ -74,7 +74,8 @@
   if (!SWIG_IsOK(res)) { 
     %dirout_fail(res,"$type");
   }
-  static $*ltype temp = %reinterpret_cast(argp, $*ltype);
+  static $*ltype temp;
+  temp = %reinterpret_cast(argp, $*ltype);
   $result =  &temp;
 }
 

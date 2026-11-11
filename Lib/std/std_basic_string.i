@@ -1,4 +1,3 @@
-%include <exception.i>
 %include <std_container.i>
 %include <std_alloc.i>
 %include <std_char_traits.i>
@@ -55,7 +54,16 @@ namespace std {
 
     size_type capacity() const;
 
-    void reserve(size_type __res_arg = 0);
+    void reserve(size_type __res_arg);
+    %extend {
+      void shrink_to_fit() {
+        %#if __cplusplus >= 202002L
+          self->shrink_to_fit();
+        %#else
+          self->reserve();
+        %#endif
+      }
+    }
 
 
     // Modifiers:
@@ -195,7 +203,7 @@ namespace std {
     %std_sequence_methods_val(basic_string);    
 
 
-    %ignore pop();
+    %ignore pop;
 
 
 #ifdef %swig_basic_string

@@ -7,7 +7,7 @@
 // Typemap changes required to mix %shared_ptr and %interface_impl
 // Note we don't have a way to use $javainterfacename/$csinterfacename (yet),
 // so we improvise somewhat by adding the SwigImpl suffix
-%define SWIG_SHARED_PTR_INTERFACE_TYPEMAPS(CONST, TYPE...)
+%define SHARED_PTR_INTERFACE_TYPEMAPS(CONST, TYPE...)
 #if defined(SWIGJAVA)
 %typemap(javain) SWIG_SHARED_PTR_QNAMESPACE::shared_ptr< CONST TYPE >,
                  SWIG_SHARED_PTR_QNAMESPACE::shared_ptr< CONST TYPE > &,
@@ -48,10 +48,10 @@
 %shared_ptr(Space::Bottom2)
 %shared_ptr(Space::Bottom3)
 
-%include "swiginterface.i"
-SWIG_SHARED_PTR_INTERFACE_TYPEMAPS(, Space::ABase1)
-SWIG_SHARED_PTR_INTERFACE_TYPEMAPS(, Space::CBase1)
-SWIG_SHARED_PTR_INTERFACE_TYPEMAPS(, Space::CBase2)
+%include <swiginterface.i>
+SHARED_PTR_INTERFACE_TYPEMAPS(, Space::ABase1)
+SHARED_PTR_INTERFACE_TYPEMAPS(, Space::CBase1)
+SHARED_PTR_INTERFACE_TYPEMAPS(, Space::CBase2)
 %interface_impl(Space::ABase1)
 %interface_impl(Space::CBase1)
 %interface_impl(Space::CBase2)

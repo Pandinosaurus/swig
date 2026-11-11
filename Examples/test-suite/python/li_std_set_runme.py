@@ -20,6 +20,11 @@ if next(i) != "b":
     raise RuntimeError
 if next(i) != "c":
     raise RuntimeError
+try:
+    next(i)
+    raise RuntimeError
+except StopIteration as e:
+    pass
 
 
 b = s.begin()
@@ -92,3 +97,35 @@ for i in s:
 
 if (len(sum) != 3 or (not 1 in sum) or (not "hello" in sum) or (not (1, 2) in sum)):
     raise RuntimeError
+
+# Create from Python set
+s = set_string({"x", "y", "z"})
+sum = ""
+for i in s:
+    sum = sum + i
+
+if sum != "xyz":
+    raise RuntimeError
+
+# Compare open and closed iterators
+b = s.iterator() # closed iterator
+b += 3
+try:
+    b.value()
+    raise RuntimeError
+except StopIteration as e:
+    pass
+
+b = s.iterator() # closed iterator
+try:
+    b += 4
+    raise RuntimeError
+except StopIteration as e:
+    pass
+
+b = s.begin() # open iterator
+b += 3
+# b.value() # undefined behaviour
+
+b = s.begin() # open iterator
+# b += 4 # no StopIteration, but can't test this as the iterator is now two off the end, which is undefined behaviour

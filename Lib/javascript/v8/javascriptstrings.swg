@@ -7,20 +7,19 @@ SWIGINTERN int
 SWIG_AsCharPtrAndSize(SWIGV8_VALUE valRef, char** cptr, size_t* psize, int *alloc)
 {
   if(valRef->IsString()) {
-%#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031903)
-    v8::Handle<v8::String> js_str = v8::Handle<v8::String>::Cast(valRef);
-%#else
     v8::Local<v8::String> js_str = v8::Local<v8::String>::Cast(valRef);
-%#endif
 
     size_t len = SWIGV8_UTF8_LENGTH(js_str) + 1;
-    char* cstr = new char[len];
+    char* cstr = (char*) %new_array(len, char);
     SWIGV8_WRITE_UTF8(js_str, cstr, len);
     
     if(alloc) *alloc = SWIG_NEWOBJ;
     if(psize) *psize = len;
     if(cptr) *cptr = cstr;
     
+    return SWIG_OK;
+  } else if (valRef->IsNull()) {
+    if (cptr) *cptr = 0;
     return SWIG_OK;
   } else {
     if(valRef->IsObject()) {
@@ -53,11 +52,7 @@ SWIG_FromCharPtrAndSize(const char* carray, size_t size)
       // TODO: handle extra long strings
       return SWIGV8_UNDEFINED();
     } else {
-%#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031903)
-      v8::Handle<v8::String> js_str = SWIGV8_STRING_NEW2(carray, size);
-%#else
       v8::Local<v8::String> js_str = SWIGV8_STRING_NEW2(carray, size);
-%#endif
       return js_str;
     }
   } else {

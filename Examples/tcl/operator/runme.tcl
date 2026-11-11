@@ -1,6 +1,6 @@
 # Operator overloading example
 
-catch { load ./example[info sharedlibextension] example}
+catch { load ./example[info sharedlibextension] Example}
 
 set a [Complex -args 2 3]
 set b [Complex -args -5 10]
@@ -18,7 +18,7 @@ puts "a*b  = [$d str]"
 set e [Complex_- $a $c]
 puts "a-c  = [Complex_str $e]"
 
-set f [new_ComplexCopy $e]
+set f [Complex -args $e]
 puts "f    = [$f str]"
 
 # Call assignment operator

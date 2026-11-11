@@ -14,7 +14,6 @@
 
 %{
 #include <set>
-#include <stdexcept>
 %}
 
 %fragment("SWIG_SetSize", "header", fragment="SWIG_JavaIntFromSize_t") {
@@ -48,6 +47,7 @@ class set {
 
 %typemap(javabase) std::set<T> "java.util.AbstractSet<$typemap(jboxtype, T)>"
 %proxycode %{
+  @SuppressWarnings("this-escape")
   public $javaclassname(java.util.Collection<? extends $typemap(jboxtype, T)> collection) {
     this();
     addAll(collection);
@@ -96,6 +96,10 @@ class set {
       public boolean hasNext() {
         return curr.isNot(end);
       }
+
+      public void remove() {
+        throw new java.lang.UnsupportedOperationException();
+      }
     }.init();
   }
 
@@ -138,7 +142,7 @@ class set {
   public:
 
     struct iterator {
-      %typemap(javaclassmodifiers) iterator "protected class"
+      %typemap(javaclassmodifiers) iterator "public class"
       %extend {
         void incrementUnchecked() {
           ++(*$self);

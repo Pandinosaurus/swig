@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -32,8 +32,8 @@ current_dir = os.getcwd()
 # version directory path $ENV/swig/<x.x.x>
 dirpath = os.path.join(current_dir, dirname)
 
-if sys.version_info[0:2] < (2, 7):
-     print("Error: Python 2.7 or higher is required")
+if sys.version_info[0] < 3:
+     print("Error: Python 3 or higher is required")
      sys.exit(3)
 
 # Check name matches normal unix conventions
@@ -42,18 +42,18 @@ if dirname.lower() != dirname:
     sys.exit(3)
 
 # If directory and tarball exist, remove it
-print("Removing " + dirname)
 if check_dir_exists(dirpath):
+    print("Removing " + dirpath)
     run_command("rm", "-rf", dirpath)
 
-print("Removing " + dirname + ".tar if exists")
 filename = dirpath + ".tar"
 if check_file_exists(filename):
+    print("Removing " + filename)
     run_command("rm", "-rf", filename)
 
-print("Removing " + dirname + ".tar.gz if exists")
 filename += ".gz"
 if check_file_exists(filename):
+    print("Removing " + filename)
     run_command("rm", "-rf", filename)
 
 # Grab the code from git
@@ -89,10 +89,10 @@ if not skip_checks:
 
 print("Tagging release")
 tag = "v" + version
-force = "-f " if force_tag else ""
+force = "-f" if force_tag else ""
 command = ["git", "tag", "-a", "-m", "'Release version " + version + "'"]
-force and command.extend(force, tag)
-not force and command.append(tag)
+force and command.append(force)
+command.append(tag)
 run_command(*command) == 0 or failed()
 
 outdir = dirname + "/"
@@ -113,15 +113,15 @@ print("Building system")
 run_command("mkdir", "-p", dirpath)
 run_command("./autogen.sh", cwd=dirpath) == 0 or failed()
 
-cmdpath = os.path.join(dirpath, "Source", "CParse")
-run_command("bison", "-y", "-d", "parser.y", cwd=cmdpath) == 0 or failed()
-run_command("mv", "y.tab.c", "parser.c", cwd=cmdpath) == 0 or failed()
-run_command("mv", "y.tab.h", "parser.h", cwd=cmdpath) == 0 or failed()
+run_command("./configure", cwd=dirpath) == 0 or failed()
+run_command("make", "-CSource", "CParse/parser.c", cwd=dirpath) == 0 or failed()
 
-run_command("make", "-f", "Makefile.in", "libfiles", "srcdir=./", cwd=dirpath) == 0 or failed()
+run_command("make", "libfiles", cwd=dirpath) == 0 or failed()
 
-# Remove autoconf files
-run_command("find", dirname, "-name", "autom4te.cache", "-exec", "rm", "-rf", "{}", ";", cwd=rootdir)
+run_command("make", "distclean", cwd=dirpath) == 0 or failed()
+
+# Remove autotools files
+run_command("find", dirname, "-name", ".deps", "-exec", "rmdir", "{}", ";", cwd=rootdir)
 
 # Build documentation
 print("Building html documentation")
@@ -129,8 +129,7 @@ docpath = os.path.join(dirpath, "Doc", "Manual")
 run_command("make", "all", "clean-baks", cwd=docpath) == 0 or failed()
 
 # Build the tar-ball
-run_command("tar", "-cf", dirname + ".tar", dirname, stdout=open(dirname + ".tar", "w")) == 0 or failed()
-run_command("gzip", dirname + ".tar", stdout=open(dirname + ".tar.gz", "w")) == 0 or failed()
+run_command("tar", "-czf", dirname + ".tar.gz", dirname) == 0 or failed()
 
 print("Finished building " + dirname + ".tar.gz")
 

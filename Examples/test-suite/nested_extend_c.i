@@ -1,6 +1,6 @@
 %module nested_extend_c
 
-#if defined(SWIG_JAVASCRIPT_V8)
+#if defined(SWIG_JAVASCRIPT_V8) || defined(SWIG_JAVASCRIPT_NAPI)
 
 %inline %{
 #if __GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8)
@@ -12,7 +12,11 @@
 
 #endif
 
-#if !defined(SWIGOCTAVE) && !defined(SWIG_JAVASCRIPT_V8)
+%{
+#include "stdlib.h"
+%}
+
+#if !defined(SWIGOCTAVE) && !defined(SWIG_JAVASCRIPT_V8) && !defined(SWIG_JAVASCRIPT_NAPI)
 %extend hiA {
   hiA() {
    union hiA *self = (union hiA *)malloc(sizeof(union hiA));
@@ -22,7 +26,7 @@
   char hi_extend() {
     return $self->c;
   }
-  static const long swig_size = sizeof(union hiA);
+  static const long type_size = sizeof(union hiA);
 }
 %extend lowA {
   lowA() {
@@ -34,7 +38,7 @@
   int low_extend() {
     return $self->num;
   }
-  static const long swig_size = sizeof(struct lowA);
+  static const long type_size = sizeof(struct lowA);
 }
 
 %extend hiB {
@@ -46,7 +50,7 @@
   char hi_extend() {
     return $self->c;
   }
-  static const long swig_size = sizeof(union hiB);
+  static const long type_size = sizeof(union hiB);
 }
 %extend lowB {
   lowB() {
@@ -58,7 +62,7 @@
   int low_extend() {
     return $self->num;
   }
-  static const long swig_size = sizeof(struct lowB);
+  static const long type_size = sizeof(struct lowB);
 }
 
 %extend FOO_bar {
@@ -67,7 +71,7 @@
     }
 };
 %extend NestedA {
-  static const long swig_size = sizeof(struct NestedA);
+  static const long type_size = sizeof(struct NestedA);
 }
 
 #endif

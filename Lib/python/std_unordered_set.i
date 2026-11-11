@@ -5,17 +5,6 @@
 %fragment("StdUnorderedSetTraits","header",fragment="StdSequenceTraits")
 %{
   namespace swig {
-    template <class SwigPySeq, class Key, class Hash, class Compare, class Alloc>
-    inline void 
-    assign(const SwigPySeq& swigpyseq, std::unordered_set<Key,Hash,Compare,Alloc>* seq) {
-      // seq->insert(swigpyseq.begin(), swigpyseq.end()); // not used as not always implemented
-      typedef typename SwigPySeq::value_type value_type;
-      typename SwigPySeq::const_iterator it = swigpyseq.begin();
-      for (;it != swigpyseq.end(); ++it) {
-	seq->insert(seq->end(),(value_type)(*it));
-      }
-    }
-
     template <class Key, class Hash, class Compare, class Alloc>
     struct traits_reserve<std::unordered_set<Key,Hash,Compare,Alloc> >  {
       static void reserve(std::unordered_set<Key,Hash,Compare,Alloc> &seq, typename std::unordered_set<Key,Hash,Compare,Alloc>::size_type n) {
@@ -39,6 +28,9 @@
   }
 %}
 
+// A set of Python objects takes anything, so the catch-all __contains__ overload is redundant
+%ignore std::unordered_set<swig::SwigPtr_PyObject>::__contains__(PyObject *);
+
 %define %swig_unordered_set_methods(unordered_set...)
   %swig_sequence_forward_iterator(unordered_set);
   %swig_container_methods(unordered_set);
@@ -58,8 +50,20 @@
        return self->find(x) != self->end();
      }
 
+     bool __contains__(PyObject *) {
+       return false;
+     }
+
      value_type __getitem__(difference_type i) const throw (std::out_of_range) {
        return *(swig::cgetpos(self, i));
+     }
+
+     void add(value_type x) {
+       self->insert(x);
+     }
+
+     void discard(value_type x) {
+       self->erase(x);
      }
   }
 %enddef

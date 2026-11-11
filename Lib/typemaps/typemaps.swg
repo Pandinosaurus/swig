@@ -140,18 +140,11 @@ to a Tcl variable you might do this :
 
        x = neg(x)
 
-Note : previous versions of SWIG used the symbol 'BOTH' to mark
-input/output arguments.   This is still supported, but will be slowly
-phased out in future releases.
-
 */
 
 
 #if defined(SWIG_INOUT_NODEF)
 
 %apply_checkctypes(%typemaps_inoutn)
-
-%apply size_t& { std::size_t& };
-%apply ptrdiff_t& { std::ptrdiff_t& };
 
 #endif

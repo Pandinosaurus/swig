@@ -14,7 +14,6 @@
 #include <vector>
 #include <map>
 
-
 /*
   Use -DSWIG_PYTHON_DIRECTOR_NO_VTABLE if you don't want to generate a 'virtual
   table', and avoid multiple GetAttr calls to retrieve the python
@@ -173,12 +172,12 @@ namespace Swig {
         swig_msg += msg;
       }
       if (!PyErr_Occurred()) {
-        PyErr_SetString(error, what());
+        PyErr_SetString(error, swig_msg.c_str());
       }
       SWIG_PYTHON_THREAD_END_BLOCK;
     }
 
-    virtual ~DirectorException() throw() {
+    virtual ~DirectorException() SWIG_NOEXCEPT {
     }
 
     /* Deprecated, use what() instead */
@@ -186,7 +185,7 @@ namespace Swig {
       return what();
     }
 
-    const char *what() const throw() {
+    const char *what() const SWIG_NOEXCEPT {
       return swig_msg.c_str();
     }
 
@@ -244,31 +243,6 @@ namespace Swig {
   };
 
 
-#if defined(SWIG_PYTHON_THREADS)
-/*  __THREAD__ is the old macro to activate some thread support */
-# if !defined(__THREAD__)
-#   define __THREAD__ 1
-# endif
-#endif
-
-#ifdef __THREAD__
-# include "pythread.h"
-  class Guard {
-    PyThread_type_lock &mutex_;
-
-  public:
-    Guard(PyThread_type_lock & mutex) : mutex_(mutex) {
-      PyThread_acquire_lock(mutex_, WAIT_LOCK);
-    }
-
-    ~Guard() {
-      PyThread_release_lock(mutex_);
-    }
-  };
-# define SWIG_GUARD(mutex) Guard _guard(mutex)
-#else
-# define SWIG_GUARD(mutex)
-#endif
 
   /* director base class */
   class Director {
@@ -282,7 +256,7 @@ namespace Swig {
     void swig_decref() const {
       if (swig_disown_flag) {
         SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-        Py_DECREF(swig_self);
+        SWIG_Py_DECREF(swig_self);
         SWIG_PYTHON_THREAD_END_BLOCK;
       }
     }
@@ -313,7 +287,7 @@ namespace Swig {
     /* increase the reference count of the wrapped python object */
     void swig_incref() const {
       if (swig_disown_flag) {
-        Py_INCREF(swig_self);
+        SWIG_Py_INCREF(swig_self);
       }
     }
 
@@ -329,15 +303,13 @@ namespace Swig {
   private:
     typedef std::map<void *, GCItem_var> swig_ownership_map;
     mutable swig_ownership_map swig_owner;
-#ifdef __THREAD__
-    static PyThread_type_lock swig_mutex_own;
-#endif
+    SWIG_GUARD_DECLARATION(swig_mutex_own)
 
   public:
     template <typename Type>
     void swig_acquire_ownership_array(Type *vptr) const {
       if (vptr) {
-        SWIG_GUARD(swig_mutex_own);
+        SWIG_GUARD(swig_mutex_own)
         swig_owner[vptr] = new GCArray_T<Type>(vptr);
       }
     }
@@ -345,14 +317,14 @@ namespace Swig {
     template <typename Type>
     void swig_acquire_ownership(Type *vptr) const {
       if (vptr) {
-        SWIG_GUARD(swig_mutex_own);
+        SWIG_GUARD(swig_mutex_own)
         swig_owner[vptr] = new GCItem_T<Type>(vptr);
       }
     }
 
     void swig_acquire_ownership_obj(void *vptr, int own) const {
       if (vptr && own) {
-        SWIG_GUARD(swig_mutex_own);
+        SWIG_GUARD(swig_mutex_own)
         swig_owner[vptr] = new GCItem_Object(own);
       }
     }
@@ -360,7 +332,7 @@ namespace Swig {
     int swig_release_ownership(void *vptr) const {
       int own = 0;
       if (vptr) {
-        SWIG_GUARD(swig_mutex_own);
+        SWIG_GUARD(swig_mutex_own)
         swig_ownership_map::iterator iter = swig_owner.find(vptr);
         if (iter != swig_owner.end()) {
           own = iter->second->get_own();
@@ -381,9 +353,7 @@ namespace Swig {
     }
   };
 
-#ifdef __THREAD__
-  PyThread_type_lock Director::swig_mutex_own = PyThread_allocate_lock();
-#endif
+  SWIG_GUARD_DEFINITION(Director, swig_mutex_own)
 }
 
 #endif

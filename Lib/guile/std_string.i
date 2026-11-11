@@ -11,8 +11,6 @@
 // However, I think I'll wait until someone asks for it...
 // ------------------------------------------------------------------------
 
-%include <exception.i>
-
 %{
 #include <string>
 %}
@@ -26,61 +24,74 @@ namespace std {
     %typemap(typecheck) string = char *;
     %typemap(typecheck) const string & = char *;
 
-    %typemap(in) string (char * tempptr) {
+    %typemap(in) string {
         if (scm_is_string($input)) {
-            tempptr = SWIG_scm2str($input);
-            $1.assign(tempptr);
-            if (tempptr) SWIG_free(tempptr);
+            size_t len;
+            char *tempptr = scm_to_utf8_stringn($input, &len);
+            $1.assign(tempptr, len);
+            SWIG_free(tempptr);
         } else {
             SWIG_exception(SWIG_TypeError, "string expected");
         }
     }
 
-    %typemap(in) const string & ($*1_ltype temp, char *tempptr) {
+    %typemap(in) const string & ($*1_ltype temp) {
         if (scm_is_string($input)) {
-            tempptr = SWIG_scm2str($input);
-            temp.assign(tempptr);
-            if (tempptr) SWIG_free(tempptr);
+            size_t len;
+            char *tempptr = scm_to_utf8_stringn($input, &len);
+            temp.assign(tempptr, len);
+            SWIG_free(tempptr);
             $1 = &temp;
         } else {
             SWIG_exception(SWIG_TypeError, "string expected");
         }
     }
 
-    %typemap(in) string * (char *tempptr) {
+    %typemap(in) string * {
         if (scm_is_string($input)) {
-            tempptr = SWIG_scm2str($input);
-            $1 = new $*1_ltype(tempptr);
-            if (tempptr) SWIG_free(tempptr);
+            size_t len;
+            char *tempptr = scm_to_utf8_stringn($input, &len);
+            $1 = new $*1_ltype(tempptr, len);
+            SWIG_free(tempptr);
         } else {
             SWIG_exception(SWIG_TypeError, "string expected");
         }
     }
 
     %typemap(out) string {
-        $result = SWIG_str02scm($1.c_str());
+        $result = scm_from_utf8_stringn($1.data(), $1.size());
     }
 
     %typemap(out) const string & {
-        $result = SWIG_str02scm($1->c_str());
+        $result = scm_from_utf8_stringn($1->data(), $1->size());
     }
 
     %typemap(out) string * {
-        $result = SWIG_str02scm($1->c_str());
+        $result = scm_from_utf8_stringn($1->data(), $1->size());
     }
 
     %typemap(varin) string {
         if (scm_is_string($input)) {
-	    char *tempptr = SWIG_scm2str($input);
-            $1.assign(tempptr);
-            if (tempptr) SWIG_free(tempptr);
+            size_t len;
+            char *tempptr = scm_to_utf8_stringn($input, &len);
+            $1.assign(tempptr, len);
+            SWIG_free(tempptr);
         } else {
             SWIG_exception(SWIG_TypeError, "string expected");
         }
     }
 
     %typemap(varout) string {
-        $result = SWIG_str02scm($1.c_str());
+        $result = scm_from_utf8_stringn($1.data(), $1.size());
     }
 
+    %typemap(throws) string {
+      scm_throw(scm_from_locale_symbol("swig-exception"),
+                scm_list_n(scm_from_utf8_stringn($1.data(), $1.size()), SCM_UNDEFINED));
+    }
+
+    %typemap(throws) const string & {
+      scm_throw(scm_from_locale_symbol("swig-exception"),
+                scm_list_n(scm_from_utf8_stringn($1.data(), $1.size()), SCM_UNDEFINED));
+    }
 }

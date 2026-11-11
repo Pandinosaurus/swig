@@ -6,13 +6,24 @@ LANGUAGE     = ruby
 RUBY         = @RUBY@
 SCRIPTSUFFIX = _runme.rb
 
+HAVE_CXX11   = @HAVE_CXX11@
+HAVE_CXX14   = @HAVE_CXX14@
+HAVE_CXX17   = @HAVE_CXX17@
+HAVE_CXX20   = @HAVE_CXX20@
+HAVE_CXX23   = @HAVE_CXX23@
+HAVE_CXX26   = @HAVE_CXX26@
 srcdir       = @srcdir@
 top_srcdir   = @top_srcdir@
 top_builddir = @top_builddir@
+SHELL_PATH_SEP = @SHELL_PATH_SEP@
+
+FAILING_CPP_TESTS = \
+	cpp17_map_no_default_ctor \
 
 CPP_TEST_CASES = \
 	li_cstring \
 	li_factory \
+	li_std_containers_int \
 	li_std_functors \
 	li_std_list \
 	li_std_multimap \
@@ -28,6 +39,7 @@ CPP_TEST_CASES = \
 	ruby_minherit_shared_ptr \
 	ruby_naming \
 	ruby_rdata \
+	ruby_typeddata_embedded \
 	ruby_track_objects \
 	ruby_track_objects_directors \
 	std_containers \
@@ -36,10 +48,6 @@ CPP_TEST_CASES = \
 
 CPP11_TEST_CASES = \
 	cpp11_hash_tables \
-	cpp11_shared_ptr_const \
-	cpp11_shared_ptr_nullptr_in_containers \
-	cpp11_shared_ptr_overload \
-	cpp11_shared_ptr_upcast \
 	cpp11_std_unordered_map \
 	cpp11_std_unordered_multimap \
 	cpp11_std_unordered_multiset \
@@ -56,6 +64,9 @@ include $(srcdir)/../common.mk
 
 # Overridden variables here
 SWIGOPT += -w801 -noautorename -features autodoc=4
+
+# Ensure testsuite remains free from SWIG warnings.
+SWIGOPT += -Werror
 
 # Custom tests - tests with additional commandline options
 ruby_alias_global_function.ctest: SWIGOPT += -globalmodule
@@ -83,9 +94,9 @@ ruby_naming.cpptest: SWIGOPT += -autorename
 # a file is found which has _runme.rb appended after the testcase name.
 run_testcase = \
 	if [ -f $(SCRIPTDIR)/$(SCRIPTPREFIX)$*$(SCRIPTSUFFIX) ]; then \
-	  env LD_LIBRARY_PATH=.:$$LD_LIBRARY_PATH $(RUNTOOL) $(RUBY) $(RUBYFLAGS) -I$(srcdir):. $(SCRIPTDIR)/$(SCRIPTPREFIX)$*$(SCRIPTSUFFIX); \
+	  env LD_LIBRARY_PATH=.:$$LD_LIBRARY_PATH $(RUNTOOL) $(RUBY) $(RUBYFLAGS) -I'$(srcdir)$(SHELL_PATH_SEP).' -- $(SCRIPTDIR)/$(SCRIPTPREFIX)$*$(SCRIPTSUFFIX); \
 	elif [ -f $(SCRIPTDIR)/$(SCRIPTPREFIX)$*.so ] ; then \
-	  env LD_LIBRARY_PATH=.:$$LD_LIBRARY_PATH $(RUNTOOL) $(RUBY) $(RUBYFLAGS) -I$(srcdir):. -r$(SCRIPTDIR)/$(SCRIPTPREFIX)$*.so -e '' ; \
+	  env LD_LIBRARY_PATH=.:$$LD_LIBRARY_PATH $(RUNTOOL) $(RUBY) $(RUBYFLAGS) -I'$(srcdir)$(SHELL_PATH_SEP).' -r$(SCRIPTDIR)/$(SCRIPTPREFIX)$*.so -e '' ; \
 	fi
 
 # Clean

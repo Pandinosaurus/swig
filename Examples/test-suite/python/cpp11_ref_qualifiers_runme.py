@@ -1,4 +1,5 @@
 import cpp11_ref_qualifiers
+from swig_test_utils import swig_assert, swig_check
 
 h = cpp11_ref_qualifiers.Host()
 
@@ -9,6 +10,21 @@ h.h6()
 h.h7()
 
 h.h()
+
+th = cpp11_ref_qualifiers.TypedefHost()
+th.t1()
+swig_assert(not hasattr(th, "t2"), "t2 should be ignored")
+swig_assert(not hasattr(th, "t3"), "t3 should be ignored")
+
+fh = cpp11_ref_qualifiers.FuncPtrHost()
+swig_check(cpp11_ref_qualifiers.callIntFunc(fh.p1(), 1), 2)
+swig_assert(not hasattr(fh, "p2"), "p2 should be ignored")
+swig_check(cpp11_ref_qualifiers.callIntFunc(fh.p3Renamed(), 2), 3)
+
+lh = cpp11_ref_qualifiers.ListHost()
+swig_check(lh.lv(), 1)
+swig_assert(not hasattr(lh, "rv"), "rv should be ignored")
+swig_check(lh.clv(), 3)
 
 # %feature testing
 f = cpp11_ref_qualifiers.Features()
@@ -43,3 +59,31 @@ s = co.StringConvertMove()
 
 co2 = cpp11_ref_qualifiers.ConversionOperators2()
 s = co2.StringConvertMove()
+
+# The overloads with a cv-qualifier
+cvo = cpp11_ref_qualifiers.ConstOverloads()
+swig_check(cvo.cl(), 1)
+swig_check(cvo.cl_const(), 2)
+swig_check(cvo.cr(), 3)
+swig_check(cvo.cr_const(), 4)
+swig_check(cvo.cvl(), 5)
+swig_check(cvo.cvl_const_volatile(), 6)
+
+# Default arguments
+from swig_test_utils import swig_assert, swig_check
+
+d = cpp11_ref_qualifiers.DefaultArgs()
+swig_check(d.vol(), 100)
+swig_check(d.vol(10), 100)
+swig_check(d.vol(10, 20), 100)
+swig_check(d.lref(), 200)
+swig_check(d.lref(10), 200)
+swig_check(d.lref(10, 20), 200)
+swig_check(d.cvref_renamed(), 3)
+swig_check(d.cvref_renamed(10), 12)
+swig_check(d.cvref_renamed(10, 20), 30)
+swig_check(d.rv(), 3)
+swig_check(d.rv(10), 12)
+swig_check(d.rv(10, 20), 30)
+swig_assert(not hasattr(d, "cvref"), "cvref should be renamed")
+swig_assert(not hasattr(d, "crv"), "crv should not be wrapped")

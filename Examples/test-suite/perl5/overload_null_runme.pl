@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 24;
+use Test::More tests => 32;
 BEGIN { use_ok('overload_null') }
 require_ok('overload_null');
 
@@ -32,13 +32,25 @@ is(14, $o->byval1cpr(undef));
 is(15, $o->byval2cpr(undef));
 is(16, $o->byval2cpr($x));
 
-# forward class declaration
-is(17, $o->byval1forwardptr($x));
-is(18, $o->byval1forwardptr(undef));
+# fwd class declaration
+is(17, $o->byval1fwdptr($x));
+is(18, $o->byval1fwdptr(undef));
 
-is(19, $o->byval2forwardptr(undef));
-is(20, $o->byval2forwardptr($x));
+is(19, $o->byval2fwdptr(undef));
+is(20, $o->byval2fwdptr($x));
 
-is(21, $o->byval1forwardref($x));
+is(21, $o->byval1fwdref($x));
 
-is(22, $o->byval2forwardref($x));
+is(22, $o->byval2fwdref($x));
+
+is(23, $o->bychar1("a"));
+is(24, $o->bychar1(undef));
+
+# NULL is a NULL pointer for an array of char too
+is(37, $o->bychararray($x));
+is(-38, $o->bychararray(undef));
+is(38, $o->bychararray("ab"));
+
+is(39, $o->byunsizedchararray($x));
+is(-40, $o->byunsizedchararray(undef));
+is(40, $o->byunsizedchararray("ab"));

@@ -1,22 +1,9 @@
 %insert(runtime) %{
 
-// Note: since 3.19 there are new CallBack types, since 03.21.9 the old ones have been removed
-#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031903)
-typedef v8::InvocationCallback  SwigV8FunctionCallback;
-typedef v8::AccessorGetter      SwigV8AccessorGetterCallback;
-typedef v8::AccessorSetter      SwigV8AccessorSetterCallback;
-typedef v8::AccessorInfo        SwigV8PropertyCallbackInfoVoid;
-#elif (V8_MAJOR_VERSION-0) < 5
-typedef v8::FunctionCallback            SwigV8FunctionCallback;
-typedef v8::AccessorGetterCallback      SwigV8AccessorGetterCallback;
-typedef v8::AccessorSetterCallback      SwigV8AccessorSetterCallback;
-typedef v8::PropertyCallbackInfo<void>  SwigV8PropertyCallbackInfoVoid;
-#else
 typedef v8::FunctionCallback            SwigV8FunctionCallback;
 typedef v8::AccessorNameGetterCallback  SwigV8AccessorGetterCallback;
 typedef v8::AccessorNameSetterCallback  SwigV8AccessorSetterCallback;
 typedef v8::PropertyCallbackInfo<void>  SwigV8PropertyCallbackInfoVoid;
-#endif
 
 /**
  * Creates a class template for a class with specified initialization function.
@@ -54,7 +41,7 @@ SWIGRUNTIME void SWIGV8_AddMemberFunction(SWIGV8_FUNCTION_TEMPLATE class_templ, 
 SWIGRUNTIME void SWIGV8_AddMemberVariable(SWIGV8_FUNCTION_TEMPLATE class_templ, const char* symbol,
   SwigV8AccessorGetterCallback getter, SwigV8AccessorSetterCallback setter) {
   SWIGV8_OBJECT_TEMPLATE proto_templ = class_templ->InstanceTemplate();
-  proto_templ->SetAccessor(SWIGV8_SYMBOL_NEW(symbol), getter, setter);
+  proto_templ->SetNativeDataProperty(SWIGV8_SYMBOL_NEW(symbol), getter, setter);
 }
 
 /**
@@ -62,11 +49,7 @@ SWIGRUNTIME void SWIGV8_AddMemberVariable(SWIGV8_FUNCTION_TEMPLATE class_templ, 
  */
 SWIGRUNTIME void SWIGV8_AddStaticFunction(SWIGV8_OBJECT obj, const char* symbol,
   const SwigV8FunctionCallback& _func, v8::Local<v8::Context> context) {
-#if (V8_MAJOR_VERSION-0) < 5
-  obj->Set(SWIGV8_SYMBOL_NEW(symbol), SWIGV8_FUNCTEMPLATE_NEW(_func)->GetFunction());
-#else
   SWIGV8_MAYBE_CHECK(obj->Set(context, SWIGV8_SYMBOL_NEW(symbol), SWIGV8_FUNCTEMPLATE_NEW(_func)->GetFunction(context).ToLocalChecked()));
-#endif
 }
 
 /**
@@ -75,36 +58,23 @@ SWIGRUNTIME void SWIGV8_AddStaticFunction(SWIGV8_OBJECT obj, const char* symbol,
 SWIGRUNTIME void SWIGV8_AddStaticVariable(SWIGV8_OBJECT obj, const char* symbol,
   SwigV8AccessorGetterCallback getter, SwigV8AccessorSetterCallback setter,
   v8::Local<v8::Context> context) {
-#if (V8_MAJOR_VERSION-0) < 5
-  obj->SetAccessor(SWIGV8_SYMBOL_NEW(symbol), getter, setter);
-#else
-  SWIGV8_MAYBE_CHECK(obj->SetAccessor(context, SWIGV8_SYMBOL_NEW(symbol), getter, setter));
-#endif
+  SWIGV8_MAYBE_CHECK(obj->SetNativeDataProperty(context, SWIGV8_SYMBOL_NEW(symbol), getter, setter));
 }
 
-#if (V8_MAJOR_VERSION-0) < 5
-SWIGRUNTIME void JS_veto_set_variable(v8::Local<v8::String> property, v8::Local<v8::Value> value, const SwigV8PropertyCallbackInfoVoid& info)
-#else
 SWIGRUNTIME void JS_veto_set_variable(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const SwigV8PropertyCallbackInfoVoid& info)
-#endif
 {
     char buffer[256];
     char msg[512];
     int res;
 
-#if (V8_MAJOR_VERSION-0) < 5
-    property->WriteUtf8(buffer, 256);
-    res = sprintf(msg, "Tried to write read-only variable: %s.", buffer);
-#else
     v8::Local<v8::String> sproperty;
     if (property->ToString(SWIGV8_CURRENT_CONTEXT()).ToLocal(&sproperty)) {
       SWIGV8_WRITE_UTF8(sproperty, buffer, 256);
-      res = sprintf(msg, "Tried to write read-only variable: %s.", buffer);
+      res = SWIG_snprintf(msg, sizeof(msg), "Tried to write read-only variable: %s.", buffer);
     }
     else {
       res = -1;
     }
-#endif
 
     if(res<0) {
       SWIG_exception(SWIG_ERROR, "Tried to write read-only variable.");

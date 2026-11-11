@@ -7,26 +7,28 @@ set -e # exit on failure (same as -o errexit)
 
 case "$SWIGLANG" in
 	"go")
-		if [[ "$VER" ]]; then
+		if [[ -x "$HOME/bin/gimme" ]]; then
 		  eval "$($HOME/bin/gimme ${VER}.x)"
 		  $HOME/bin/gimme --list
 		fi
 		;;
 	"javascript")
 		case "$ENGINE" in
-			"node")
-				export NVM_DIR="$HOME/.nvm"
-				[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-				nvm use ${VER}
+			"node"|"napi")
+				if [[ -n "$USE_NVM" ]]; then
+					[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+					nvm use ${VER}
+				fi
 				;;
-			*)      ;;
 		esac
 		;;
 	"ruby")
 		if ! command -v rvm; then
-			set +x
-			source $HOME/.rvm/scripts/rvm
-			set -x
+			if [ -f /etc/profile.d/rvm.sh ] ; then
+				source /etc/profile.d/rvm.sh
+			elif [ -f $HOME/.rvm/scripts/rvm ] ; then
+				source $HOME/.rvm/scripts/rvm
+			fi
 		fi
 		;;
 	*)	;;

@@ -11,6 +11,11 @@ if t.strlen("hil\0") != 4:
 if t.ustrlen("hil\0") != 4:
     raise RuntimeError("bad multi-arg typemap")
 
+if t.strlen(None) != 0:
+    raise RuntimeError("bad multi-arg typemap {}".format(t.strlen(None)))
+if t.ustrlen(None) != 0:
+    raise RuntimeError("bad multi-arg typemap {}".format(t.ustrlen(None)))
+
 #
 # creating a raw char*
 #
@@ -32,7 +37,6 @@ if cvar.var_pchar != "hola":
     raise RuntimeError("bad pointer case {}".format(cvar.var_pchar))
 
 cvar.var_namet = pc
-# if cvar.var_namet != "hola\0":
 if cvar.var_namet != "hola":
     raise RuntimeError("bad pointer case")
 

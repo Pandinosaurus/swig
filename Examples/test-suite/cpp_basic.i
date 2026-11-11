@@ -4,6 +4,9 @@
 
 %warnfilter(SWIGWARN_RUBY_WRONG_NAME) global_cint;       /* Ruby, wrong constant name */
 
+%feature("php:allowdynamicproperties", 1) Foo; /* Allow PHP-specific custom property testing in _runme.php */
+%feature("php:allowdynamicproperties", 0) Bar; /* and that this doesn't allow custom properties. */
+
 %module cpp_basic
 
 %newobject Bar::testFoo;
@@ -28,7 +31,7 @@ class Foo {
     int func2(int a) {
       return -a*num;
     }
-    
+
     int (Foo::*func_ptr)(int);
 
     const char* __str__() const { return "Foo"; }
@@ -44,6 +47,9 @@ class FooSubSub : public FooSub {
     FooSubSub() : FooSub() {}
     const char* __str__() const { return "FooSubSub"; }
 };
+
+Foo& get_reference(Foo& other) { return other; }
+const Foo& get_const_reference(const Foo& other) { return other; }
 
 %}
 
@@ -74,8 +80,15 @@ class Bar {
     Foo *testFoo(int a, Foo *f) {
       return new Foo(2 * a + (f ? f->num : 0) + fval.num);
     }
+/* Const member data and references mean this class can't be assigned. */
 private:
     Bar& operator=(const Bar&);
+};
+
+// This class is valid C++ but cannot be assigned to because it has const member data.
+struct JustConst {
+explicit JustConst(int i_inp) : i(i_inp) {}
+const int i;
 };
 
 %}
@@ -114,8 +127,8 @@ void show(void *count = 0, void *data = 0)
 %inline %{
   class Fl_Window {
   public:
-    Fl_Window() {};
-    ~Fl_Window() {};
+    Fl_Window() {}
+    ~Fl_Window() {}
   };
 %}
 

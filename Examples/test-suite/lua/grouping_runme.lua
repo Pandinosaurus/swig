@@ -1,11 +1,5 @@
-require("import")	-- the import fn
-import("grouping")	-- import lib into global
-g=grouping --alias
-
--- catching undefined variables
-local env = _ENV -- Lua 5.2
-if not env then env = getfenv () end -- Lua 5.1
-setmetatable(env, {__index=function (t,i) error("undefined global variable `"..i.."'",2) end})
+g=require("grouping")
+catch_undef_globs() -- catch "undefined" global variables
 
 assert(g.test1(5) == 5)
 g.test2(42) -- Return value is int* packed into userdata. We can't do anything with it
@@ -16,3 +10,12 @@ assert(g.test3 == 42)
 
 assert(g.NEGATE ~= nil)
 assert(g.do_unary(5, g.NEGATE) == -5)
+
+assert(g.test4(42).value == 42)
+assert(g.test5() == 37)
+assert(g.test6(42) == 42)
+
+local gr = g.MemberGrouping()
+assert(gr:method1(42) == 42)
+assert(g.MemberGrouping.method2(42) == 42)
+assert(gr:method3() == 37)

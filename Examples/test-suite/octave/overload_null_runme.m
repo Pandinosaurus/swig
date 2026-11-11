@@ -40,13 +40,25 @@ check(14, o.byval1cpr(null));
 check(15, o.byval2cpr(null));
 check(16, o.byval2cpr(x));
 
-# forward class declaration
-check(17, o.byval1forwardptr(x));
-check(18, o.byval1forwardptr(null));
+# fwd class declaration
+check(17, o.byval1fwdptr(x));
+check(18, o.byval1fwdptr(null));
 
-check(19, o.byval2forwardptr(null));
-check(20, o.byval2forwardptr(x));
+check(19, o.byval2fwdptr(null));
+check(20, o.byval2fwdptr(x));
 
-check(21, o.byval1forwardref(x));
+check(21, o.byval1fwdref(x));
 
-check(22, o.byval2forwardref(x));
+check(22, o.byval2fwdref(x));
+
+check(23, o.bychar1("a"));
+check(24, o.bychar1(null));
+
+# NULL is a NULL pointer for an array of char too
+check(37, o.bychararray(x));
+check(-38, o.bychararray(null));
+check(38, o.bychararray("ab"));
+
+check(39, o.byunsizedchararray(x));
+check(-40, o.byunsizedchararray(null));
+check(40, o.byunsizedchararray("ab"));

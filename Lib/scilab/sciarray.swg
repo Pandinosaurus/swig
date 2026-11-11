@@ -17,7 +17,7 @@
   if (FRAGMENTNAME(pvApiCtx, $input, &iRows, &iCols, &pTempData, fname)) {
     return SWIG_ERROR;
   }
-  $1 = ($1_ltype)MALLOC(sizeof($*1_ltype) * iRows * iCols);
+  $1 = iRows * iCols ? ($1_ltype)MALLOC(sizeof($*1_ltype) * iRows * iCols) : NULL;
   for (i = 0; i < iRows * iCols; i++) {
     $1[i] = ($*1_ltype) pTempData[i];
   }
@@ -32,6 +32,9 @@
   if (FRAGMENTNAME(pvApiCtx, $input, &iRows, &iCols, &pTempData, fname)) {
     return SWIG_ERROR;
   }
+  if (iRows * iCols == 0) {
+    %variable_nullref("$type", "$name");
+  }
   if (iRows*iCols <= $1_dim0) {
     size_t i;
     for (i = 0; i < $1_dim0; i++) {
@@ -40,8 +43,8 @@
   }
   else {
     char errmsg[100];
-    sprintf(errmsg, "Size of input data (%d) is too big (maximum is %d)",
-      iRows*iCols, $1_dim0);
+    SWIG_snprintf2(errmsg, sizeof(errmsg), "Size of input data (%d) is too big (maximum is %d)",
+                   iRows*iCols, $1_dim0);
     SWIG_exception_fail(SWIG_OverflowError, errmsg);
   }
 }

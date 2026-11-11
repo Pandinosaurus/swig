@@ -30,16 +30,32 @@ checkequal(14, Overload_byval1cpr(o, NULL), "test 14");
 checkequal(15, Overload_byval2cpr(o, NULL), "test 15");
 checkequal(16, Overload_byval2cpr(o, x), "test 16");
 
-// forward class declaration
-checkequal(17, Overload_byval1forwardptr(o, x), "test 17");
-checkequal(18, Overload_byval1forwardptr(o, NULL), "test 18");
+// fwd class declaration
+checkequal(17, Overload_byval1fwdptr(o, x), "test 17");
+checkequal(18, Overload_byval1fwdptr(o, NULL), "test 18");
 
-checkequal(19, Overload_byval2forwardptr(o, NULL), "test 19");
-checkequal(20, Overload_byval2forwardptr(o, x), "test 20");
+checkequal(19, Overload_byval2fwdptr(o, NULL), "test 19");
+checkequal(20, Overload_byval2fwdptr(o, x), "test 20");
 
-checkequal(21, Overload_byval1forwardref(o, x), "test 21");
+checkequal(21, Overload_byval1fwdref(o, x), "test 21");
 
-checkequal(22, Overload_byval2forwardref(o, x), "test 22");
+checkequal(22, Overload_byval2fwdref(o, x), "test 22");
+
+checkequal(23, Overload_bychar1(o, "a"), "test 23");
+// NULL is not a char and char * does not accept it either
+ierr = execstr("Overload_bychar1(o, NULL)", "errcatch");
+if ierr == 0 then swigtesterror("test 24"); end
+
+// An array of char is a string, which cannot be NULL here, as for char *
+checkequal(37, Overload_bychararray(o, x), "test 37");
+checkequal(38, Overload_bychararray(o, "ab"), "test 38");
+ierr = execstr("Overload_bychararray(o, NULL)", "errcatch");
+if ierr == 0 then swigtesterror("test 38 NULL"); end
+
+checkequal(39, Overload_byunsizedchararray(o, x), "test 39");
+checkequal(40, Overload_byunsizedchararray(o, "ab"), "test 40");
+ierr = execstr("Overload_byunsizedchararray(o, NULL)", "errcatch");
+if ierr == 0 then swigtesterror("test 40 NULL"); end
 
 exec("swigtest.quit", -1);
 

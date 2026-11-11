@@ -1,10 +1,10 @@
 %module cpp11_ref_qualifiers
 
-%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK_MSG) ccextra2;
-%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK_MSG) ccextra3;
-%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK_MSG) cc2;
-%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK_MSG) cc3;
-%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK_MSG) cc5;
+%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK) ccextra2;
+%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK) ccextra3;
+%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK) cc2;
+%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK) cc3;
+%warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK) cc5;
 
 %include <std_string.i>
 
@@ -18,19 +18,57 @@ class Host {
 public:
   string h1() & { return string(); }
   string h2() const & { return string(); }
-  string h3() && { return std::move(string()); }
-  string h4() const && { return std::move(string()); }
+  string h3() && { return string(); }
+  string h4() const && { return string(); }
   string h5() const { return string(); }
   string h6() volatile const & { return string(); }
   string h7() const volatile & { return string(); }
-  string h8() volatile const && { return std::move(string()); }
-  string h9() const volatile && { return std::move(string()); }
+  string h8() volatile const && { return string(); }
+  string h9() const volatile && { return string(); }
 
   string h() & { return string(); }
   string h() const & { return string(); }
-  string h() && { return std::move(string()); }
-  string h() const && { return std::move(string()); }
+  string h() && { return string(); }
+  string h() const && { return string(); }
 };
+%}
+
+// Member functions declared through a function typedef, t2 and t3 are ignored by default like h3
+%inline %{
+typedef string LvalueFunction() &;
+typedef string RvalueFunction() &&;
+typedef RvalueFunction RvalueFunction2;
+struct TypedefHost {
+  LvalueFunction t1;
+  RvalueFunction t2;
+  RvalueFunction2 t3;
+};
+string TypedefHost::t1() & { return string(); }
+string TypedefHost::t2() && { return string(); }
+string TypedefHost::t3() && { return string(); }
+%}
+
+// Member functions returning a pointer to a function, p2 is ignored by default like h3
+%rename(p3Renamed) FuncPtrHost::p3() const &;
+
+%inline %{
+int addOne(int i) { return i + 1; }
+int callIntFunc(int (*f)(int), int i) { return f(i); }
+struct FuncPtrHost {
+  int (*p1() &)(int) { return addOne; }
+  int (*p2() &&)(int) { return addOne; }
+  int (*p3() const &)(int) { return addOne; }
+};
+%}
+
+// The declarators after the first in a list, rv is ignored by default like h3
+%inline %{
+struct ListHost {
+  int lv() &, rv() &&, clv() const &;
+};
+int ListHost::lv() & { return 1; }
+int ListHost::rv() && { return 2; }
+int ListHost::clv() const & { return 3; }
 %}
 
 // %feature testing
@@ -89,12 +127,62 @@ struct Renames {
 %inline %{
 struct ConversionOperators {
   virtual operator string() & { return string(); }
-  virtual operator string() && { return std::move(string()); }
+  virtual operator string() && { return string(); }
   virtual ~ConversionOperators() {}
 };
 struct ConversionOperators2 {
-  virtual operator string() && { return std::move(string()); }
+  virtual operator string() && { return string(); }
   virtual ~ConversionOperators2() {}
+};
+%}
+
+// Overloads differing only in their qualifiers, which the C target language gave the same name
+%warnfilter(SWIGWARN_LANG_OVERLOAD_SHADOW, SWIGWARN_LANG_OVERLOAD_IGNORED) QualifierOverloads::r;
+%warnfilter(SWIGWARN_LANG_OVERLOAD_SHADOW, SWIGWARN_LANG_OVERLOAD_IGNORED) QualifierOverloads::rc;
+%feature("ignore", "0") QualifierOverloads::r(int i) &&;
+%feature("ignore", "0") QualifierOverloads::rc(int i) const &&;
+
+%inline %{
+struct QualifierOverloads {
+  int r(int i) & { return i + 1; }
+  int r(int i) && { return i + 2; }
+  int rc(int i) & { return i + 3; }
+  int rc(int i) const && { return i + 4; }
+};
+%}
+
+// The overloads with a cv-qualifier are called on a cv-qualified object
+%rename(cl_const) ConstOverloads::cl() const &;
+%rename(cr_const) ConstOverloads::cr() const &&;
+%rename(cvl_const_volatile) ConstOverloads::cvl() const volatile &;
+// Unignore the overloads with an rvalue ref-qualifier, as they are ignored by default
+%feature("ignore", "0") ConstOverloads::cr() &&;
+%feature("ignore", "0") ConstOverloads::cr() const &&;
+
+%inline %{
+struct ConstOverloads {
+  int cl() & { return 1; }
+  int cl() const & { return 2; }
+  int cr() && { return 3; }
+  int cr() const && { return 4; }
+  int cvl() & { return 5; }
+  int cvl() const volatile & { return 6; }
+};
+%}
+
+// Default arguments: the overloads added for the defaulted parameters keep the method's qualifiers
+%feature("except") DefaultArgs::vol(int a = 1, int b = 2) volatile %{ result = 100; %}
+%feature("except") DefaultArgs::lref(int a = 1, int b = 2) & %{ result = 200; %}
+%rename(cvref_renamed) DefaultArgs::cvref(int a = 1, int b = 2) const volatile &;
+%feature("ignore", "0") DefaultArgs::rv(int a = 1, int b = 2) &&;
+
+%inline %{
+struct DefaultArgs {
+  int vol(int a = 1, int b = 2) volatile { return a + b; }
+  int lref(int a = 1, int b = 2) & { return a + b; }
+  int cvref(int a = 1, int b = 2) const volatile & { return a + b; }
+  int rv(int a = 1, int b = 2) && { return a + b; }
+  int crv(int a = 1, int b = 2) const && { return a + b; }
 };
 %}
 

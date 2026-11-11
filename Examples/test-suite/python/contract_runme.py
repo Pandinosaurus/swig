@@ -1,4 +1,5 @@
 import contract
+from swig_test_utils import swig_check, swig_assert_raises
 
 contract.test_preassert(1, 2)
 try:
@@ -29,6 +30,25 @@ try:
 except RuntimeError:
     pass
 
+swig_check(contract.test_arg_names(1, -1), 0)
+with swig_assert_raises(RuntimeError):
+    contract.test_arg_names(-1, 1)
+
+swig_check(contract.test_result_name(-1), 1)
+with swig_assert_raises(RuntimeError):
+    contract.test_result_name(1)
+
+size = contract.ContractSize()
+size.n = 2
+size.test_member_names = 3
+swig_check(contract.test_member_names(size, 2), 5)
+with swig_assert_raises(RuntimeError):
+    contract.test_member_names(size, 1)
+
+swig_check(contract.test_literal_name("a"), ord("a"))
+with swig_assert_raises(RuntimeError):
+    contract.test_literal_name("n")
+
 f = contract.Foo()
 f.test_preassert(4, 5)
 try:
@@ -58,15 +78,15 @@ try:
 except RuntimeError:
     pass
 
-contract.Foo_stest_prepost(4, 0)
+contract.Foo.stest_prepost(4, 0)
 try:
-    contract.Foo_stest_prepost(-4, 2)
+    contract.Foo.stest_prepost(-4, 2)
     raise Exception("Failed! Static method preassertion")
 except RuntimeError:
     pass
 
 try:
-    contract.Foo_stest_prepost(4, -10)
+    contract.Foo.stest_prepost(4, -10)
     raise Exception("Failed! Static method posteassertion")
 except RuntimeError:
     pass
@@ -132,6 +152,15 @@ try:
     raise Exception("Failed! Inherited preassertion (D).")
 except RuntimeError:
     pass
+
+e = contract.E()
+e.m_i = 5
+e.manipulate_arg1(5)
+with swig_assert_raises(RuntimeError):
+    e.manipulate_arg1(6)
+e.manipulate_m_i(5)
+with swig_assert_raises(RuntimeError):
+    e.manipulate_m_i(6)
 
 # Namespace
 my = contract.myClass(1)

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-commit git hook for the SWIG repository, see Doc/Manual/Extending.html#Extending_coding_style_guidelines
+# Use all the hooks in this directory by running: git config core.hooksPath Tools/git-hooks
+
+clang_format=clang-format
+files_to_format=$(git diff-index --diff-filter=d --name-only HEAD ':Source/*/*.c' ':Source/*/*.cxx' ':Source/*/*.h')
+if [ -n "$files_to_format" ]; then
+    printf "Running ${clang_format} in git pre-commit hook to validate modified files...\n"
+    if ! ${clang_format} --dry-run --Werror ${files_to_format}; then
+        printf "Error: Fix formatting before committing, see Doc/Manual/Extending.html#Extending_coding_style_guidelines.\n"
+        exit 1
+    fi
+fi

@@ -16,6 +16,12 @@
 LANGUAGE     = errors
 ERROR_EXT    = newerr
 
+HAVE_CXX11   = @HAVE_CXX11@
+HAVE_CXX14   = @HAVE_CXX14@
+HAVE_CXX17   = @HAVE_CXX17@
+HAVE_CXX20   = @HAVE_CXX20@
+HAVE_CXX23   = @HAVE_CXX23@
+HAVE_CXX26   = @HAVE_CXX26@
 srcdir       = @srcdir@
 top_srcdir   = @top_srcdir@
 top_builddir = @top_builddir@
@@ -36,7 +42,7 @@ DOXYGEN_ERROR_TEST_CASES := $(DOXYGEN_ERROR_TEST_CASES:=.cpptest)
 
 ERROR_TEST_CASES := $(CPP_ERROR_TEST_CASES:=.cpptest) \
 		    $(C_ERROR_TEST_CASES:=.ctest) \
-		    $(DOXYGEN_ERROR_TEST_CASES)
+		    $(DOXYGEN_ERROR_TEST_CASES) \
 
 include $(srcdir)/../common.mk
 
@@ -45,27 +51,32 @@ include $(srcdir)/../common.mk
 # whatever we do here.
 $(DOXYGEN_ERROR_TEST_CASES): SWIGOPT += -doxygen
 
+# The argout container consistency check only runs when the return type is being described.
+swig_argout_container.ctest: SWIGOPT += -typehints
+
+# Warnings are reported at the line in the macro definition instead of the macro invocation.
+cpp_macroerrors.cpptest: SWIGOPT += -macroerrors
+
 # Unique module names are obtained from the .i file name (required for parallel make).
 # Note: -module overrides %module in the .i file.
 MODULE_OPTION=-module $*
 nomodule.ctest: MODULE_OPTION =
 
-# Portable dos2unix / todos for stripping CR
-TODOS        = tr -d '\r'
-#TODOS        = sed -e 's/\r$$//' # On Mac OS X behaves as if written 's/r$$//'
+# Portable dos2unix / fromdos for stripping CR
+FROMDOS       = tr -d '\r'
 
 # strip source directory from output, so that diffs compare
 STRIP_SRCDIR = sed -e 's|\\|/|g' -e 's|^$(SRCDIR)||'
 
 # Rules for the different types of tests
 %.cpptest:
-	echo "$(ACTION)ing errors testcase $*"
-	-$(SWIGINVOKE) -c++ -python -Wall -Fstandard $(MODULE_OPTION) $(SWIGOPT) $(SRCDIR)$*.i 2>&1 | $(TODOS) | $(STRIP_SRCDIR) > $*.$(ERROR_EXT)
+	$(ECHO_PROGRESS) "$(ACTION)ing errors testcase $*"
+	-$(SWIGINVOKE) -c++ -python -Wall -Fstandard $(MODULE_OPTION) $(SWIGOPT) $(SRCDIR)$*.i 2>&1 | $(FROMDOS) | $(STRIP_SRCDIR) > $*.$(ERROR_EXT)
 	$(COMPILETOOL) diff -c $(SRCDIR)$*.stderr $*.$(ERROR_EXT)
 
 %.ctest:
-	echo "$(ACTION)ing errors testcase $*"
-	-$(SWIGINVOKE) -python -Wall -Fstandard $(MODULE_OPTION) $(SWIGOPT) $(SRCDIR)$*.i 2>&1 | $(TODOS) | $(STRIP_SRCDIR) > $*.$(ERROR_EXT)
+	$(ECHO_PROGRESS) "$(ACTION)ing errors testcase $*"
+	-$(SWIGINVOKE) -python -Wall -Fstandard $(MODULE_OPTION) $(SWIGOPT) $(SRCDIR)$*.i 2>&1 | $(FROMDOS) | $(STRIP_SRCDIR) > $*.$(ERROR_EXT)
 	$(COMPILETOOL) diff -c $(SRCDIR)$*.stderr $*.$(ERROR_EXT)
 
 %.clean:
@@ -73,4 +84,4 @@ STRIP_SRCDIR = sed -e 's|\\|/|g' -e 's|^$(SRCDIR)||'
 
 clean:
 	$(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR='$(SRCDIR)' python_clean
-	@rm -f *.$(ERROR_EXT) *.py
+	@rm -f *.$(ERROR_EXT) *.py *.pyi

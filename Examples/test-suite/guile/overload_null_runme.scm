@@ -39,15 +39,28 @@
 ;(check (=~ 15 (Overload-byval2cpr o #nil)))
 ;(check (=~ 16 (Overload-byval2cpr o x)))
 
-; forward class declaration
-(check (=~ 17 (Overload-byval1forwardptr o x)))
-(check (=~ 18 (Overload-byval1forwardptr o #nil)))
+; fwd class declaration
+(check (=~ 17 (Overload-byval1fwdptr o x)))
+(check (=~ 18 (Overload-byval1fwdptr o #nil)))
 
-(check (=~ 19 (Overload-byval2forwardptr o #nil)))
-(check (=~ 20 (Overload-byval2forwardptr o x)))
+(check (=~ 19 (Overload-byval2fwdptr o #nil)))
+(check (=~ 20 (Overload-byval2fwdptr o x)))
 
-(check (=~ 21 (Overload-byval1forwardref o x)))
+(check (=~ 21 (Overload-byval1fwdref o x)))
 
-(check (=~ 22 (Overload-byval2forwardref o x)))
+(check (=~ 22 (Overload-byval2fwdref o x)))
+
+(check (=~ 23 (Overload-bychar1 o #\a)))
+;; NULL is not a char and char * does not accept it either
+(check (not (false-if-exception (Overload-bychar1 o #nil))))
+
+;; An array of char is a string, which cannot be NULL here, as for char *
+(check (=~ 37 (Overload-bychararray o x)))
+(check (=~ 38 (Overload-bychararray o "ab")))
+(check (not (false-if-exception (Overload-bychararray o #nil))))
+
+(check (=~ 39 (Overload-byunsizedchararray o x)))
+(check (=~ 40 (Overload-byunsizedchararray o "ab")))
+(check (not (false-if-exception (Overload-byunsizedchararray o #nil))))
 
 (exit 0)

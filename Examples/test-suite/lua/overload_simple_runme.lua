@@ -1,6 +1,4 @@
-require("import")	-- the import fn
-import("overload_simple")	-- import code
-for k,v in pairs(overload_simple) do _G[k]=v end -- move to global
+require_to_globs("overload_simple")
 
 -- lua has only one numeric type, foo(int) and foo(double) are the same
 -- whichever one was wrapper first will be used
@@ -51,5 +49,10 @@ assert(s.type == "Bar *")
 
 s = Spam(v)
 assert(s.type == "void *")
+
+-- A const reference to a void pointer takes any pointer, as a void pointer does
+assert(fvoidcref(f) == "fvoidcref:void *const &")
+assert(fvoidcref(v) == "fvoidcref:void *const &")
+assert(fvoidcref(3) == "fvoidcref:int")
 
 free_void(v)

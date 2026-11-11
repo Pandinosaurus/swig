@@ -99,18 +99,13 @@ namespace Swig {
 	}
       }
 
+      zend_object *swig_get_self() const { return Z_OBJ(swig_self); }
+
       void swig_disown() const {
         if (!swig_disown_flag) {
           swig_disown_flag = true;
           Z_ADDREF(swig_self);
         }
-      }
-
-      static bool swig_is_overridden_method(const char *cname, zval *z) {
-        zend_string * cname_str = zend_string_init(cname, strlen(cname), 0);
-        zend_class_entry *ce = zend_lookup_class(cname_str);
-        zend_string_release(cname_str);
-        return ce == Z_OBJCE_P(z);
       }
 
       template <typename Type>
@@ -141,10 +136,10 @@ namespace Swig {
       if (!EG(exception)) zend_throw_exception(NULL, swig_msg.c_str(), code);
     }
 
-    virtual ~DirectorException() throw() {
+    virtual ~DirectorException() SWIG_NOEXCEPT {
     }
 
-    const char *what() const throw() {
+    const char *what() const SWIG_NOEXCEPT {
       return swig_msg.c_str();
     }
 

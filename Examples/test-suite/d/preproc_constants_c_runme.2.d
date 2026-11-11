@@ -27,8 +27,8 @@ void main() {
   static assert(is(double == typeof(CONST_DOUBLE2())));
   static assert(is(double == typeof(CONST_DOUBLE3())));
   static assert(is(double == typeof(CONST_DOUBLE4())));
-  static assert(is(double == typeof(CONST_DOUBLE5())));
-  static assert(is(double == typeof(CONST_DOUBLE6())));
+  static assert(is(float == typeof(CONST_FLOAT1())));
+  static assert(is(float == typeof(CONST_FLOAT2())));
   static assert(is(int == typeof(CONST_BOOL1())));
   static assert(is(int == typeof(CONST_BOOL2())));
   static assert(is(char == typeof(CONST_CHAR())));
@@ -51,6 +51,8 @@ void main() {
   static assert(is(int == typeof(EXPR_MINUS())));
   static assert(is(int == typeof(EXPR_LSHIFT())));
   static assert(is(int == typeof(EXPR_RSHIFT())));
+  static assert(is(int == typeof(EXPR_LT())));
+  static assert(is(int == typeof(EXPR_GT())));
   static assert(is(int == typeof(EXPR_LTE())));
   static assert(is(int == typeof(EXPR_GTE())));
   static assert(is(int == typeof(EXPR_INEQUALITY())));

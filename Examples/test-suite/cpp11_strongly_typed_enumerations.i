@@ -5,11 +5,12 @@
 %warnfilter(SWIGWARN_PARSE_NAMED_NESTED_CLASS) Class1::Struct1;
 %warnfilter(SWIGWARN_PARSE_NAMED_NESTED_CLASS) Class2::Struct1;
 
-/* Forward declarations (illegally accepted by SWIG - oh well!) */
-enum Enum1 : short;
+// Some illegal forward declarations (incorrectly accepted by SWIG - oh well!)
 enum Enum3;
 enum ;
 enum : unsigned short;
+
+enum Enum1 : short; // should error as mismatches Enum1 class below
 
 %inline %{
 enum class Enum1 {
@@ -65,7 +66,17 @@ template <typename T> struct TType {
   typedef T type_name;
 };
 
-enum class Enum10 : TType<int>::type_name {
+using EnumBase9 = unsigned short;
+enum class Enum9: EnumBase9 {
+  Val1 = 0,
+  Val2 = 0x2,
+};
+%}
+
+%template() TType<unsigned char>; // Instantiate template for underlying type used in Enum10
+
+%inline %{
+enum class Enum10 : TType<unsigned char>::type_name {
   Val1, Val2, Val3 = 103, Val4
 };
 
@@ -223,3 +234,107 @@ private:
 };
 %}
 
+// Target language underlying enum type manipulation
+#if defined(SWIGCSHARP)
+%typemap(csbase, replace="1") Enum15 "short"
+%typemap(csbase) Enum16 "short"
+%warnfilter(SWIGWARN_CSHARP_MULTIPLE_INHERITANCE) Enum16;
+%typemap(csbase) Enum17 "ulong"
+#elif defined(SWIGD)
+%typemap(dbase, replace="1") Enum15 "short"
+%typemap(dbase) Enum16 "short"
+%warnfilter(SWIGWARN_D_MULTIPLE_INHERITANCE) Enum16;
+%typemap(dbase) Enum17 "uint"
+#endif
+%inline %{
+  enum class Enum15 : long long
+  {
+    Val1 = 1151,
+    Val2 = 1152,
+  };
+  enum class Enum16 : long long
+  {
+    Val1 = 1161,
+    Val2 = 1162,
+  };
+  enum class Enum17
+  {
+    Val1 = 1171,
+    Val2 = 1172,
+  };
+%}
+
+// Test handling of %rename of enum class and an enumerator.
+%rename(Enum18) QEnum18;
+%rename(Val1) QVal1;
+%inline %{
+  enum class QEnum18
+  {
+    QVal1 = 1181,
+    Val2 = 1182,
+  };
+%}
+
+// Enumerator initialised by a character literal
+%inline %{
+  enum class Enum19 {
+    Val1 = 'a', Val2
+  };
+%}
+
+// Underlying types whose target language type, such as C# char, is not a valid enum underlying type
+#if defined(SWIGCSHARP)
+%typemap(csbase, replace="1") Enum20, Enum21, Enum23 "int"
+%typemap(csbase, replace="1") Enum22 "byte"
+#elif defined(SWIGD)
+%typemap(dbase, replace="1") Enum21, Enum23 "dchar"
+#endif
+%inline %{
+  enum class Enum20 : char {
+    Val1 = 'b', Val2
+  };
+  enum class Enum21 : wchar_t {
+    Val1 = L'c', Val2, Val3 = L'\x263A', Val4
+  };
+  enum class Enum22 : bool {
+    Val1 = false, Val2 = true
+  };
+  typedef wchar_t WideChar23;
+  enum class Enum23 : WideChar23 {
+    Val1 = L'd', Val2
+  };
+%}
+
+// Regression tests for cases where SWIG incorrectly included "enum " when
+// qualifying the emunerator name:
+
+// #197
+%include <std_vector.i>
+%inline %{
+template<Enum17 E> class Bar {};
+%}
+%template(Enum17Vector) std::vector<Bar<Enum17::Val1>>;
+
+// #675
+%template(Enum17Bar) Bar<Enum17::Val2>;
+%inline %{
+class SubEnum17Bar : public Bar<Enum17::Val2> {};
+%}
+
+// #1677
+%inline %{
+#include <bitset>
+typedef std::bitset<static_cast<unsigned>(Enum17::Val1)> type1677;
+type1677 classify(int a) { return type1677{}; }
+bool has_type(const type1677&, const Enum17&) { return false; }
+%}
+
+// #2047
+%feature("compactdefaultargs") MyClass::my_func;
+%inline %{
+class MyClass {
+  public:
+    enum class PRINT_SETUP { TO_CONSOLE, TO_CSV };
+    void my_func(const PRINT_SETUP& e = PRINT_SETUP::TO_CONSOLE) { (void)e; }
+};
+%}

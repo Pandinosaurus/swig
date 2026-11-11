@@ -1,5 +1,5 @@
 
-if [ catch { load ./overload_simple[info sharedlibextension] overload_simple} err_msg ] {
+if [ catch { load ./overload_simple[info sharedlibextension] Overload_simple} err_msg ] {
 	puts stderr "Could not load shared object:\n$err_msg"
 }
 
@@ -158,6 +158,23 @@ Spam s $v
 set x [s cget -type]
 if {$x != "void *"} {
     puts stderr "Spam(void *) test failed"
+}
+
+# A const reference to a void pointer takes any pointer, as a void pointer does
+set x [fvoidcref $f]
+if {$x != "fvoidcref:void *const &"} {
+    puts stderr "fvoidcref(Foo *) test failed"
+    exit 1
+}
+set x [fvoidcref $v]
+if {$x != "fvoidcref:void *const &"} {
+    puts stderr "fvoidcref(void *) test failed"
+    exit 1
+}
+set x [fvoidcref 3]
+if {$x != "fvoidcref:int"} {
+    puts stderr "fvoidcref(int) test failed"
+    exit 1
 }
 
 free_void $v

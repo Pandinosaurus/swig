@@ -1,5 +1,17 @@
 %module kwargs_feature
 
+// The 'str' member variable shadows the str builtin in the class scope of the generated Python proxy class, so the
+// annotations that name it are qualified with the builtins module.
+#ifdef SWIGPYTHON
+%typemap(pytyping) char *fmt "typing.Optional[builtins.str]"
+%pythoncode %{
+import builtins
+%}
+%pythonstubcode %{
+import builtins
+%}
+#endif
+
 %nocopyctor;
 %feature("kwargs");
 
@@ -27,6 +39,7 @@
 
     virtual int foo(int a = 1, int b = 0) {return a + b; }
     static int statfoo(int a = 1, int b = 0) {return a + b; }
+    static int statfoo_onearg(int x = 10) {return x + x; }
 
     static Foo *create(int a = 1, int b = 0) 
     {
@@ -53,6 +66,9 @@
 
     T bar(T a = 1, T b = 0) {return a + b; }
     static T statbar(T a = 1, T b = 0) {return a + b; }
+
+    enum AnEnum {ENUMVAL1, ENUMVAL2};
+    void enumIn(AnEnum a = ENUMVAL1) {}
   };
 
 %}
@@ -127,6 +143,13 @@ struct ExtendingOptArgs1 {};
 struct ExtendingOptArgs2 {};
 %}
 
+#ifndef SWIGC
+
+// For strlen/strcpy
+%{
+#include <string.h>
+%}
+
 // Varargs
 %warnfilter(SWIGWARN_LANG_VARARGS_KEYWORD) VarargConstructor::VarargConstructor; // Can't wrap varargs with keyword arguments enabled
 %warnfilter(SWIGWARN_LANG_VARARGS_KEYWORD) VarargConstructor::vararg_method; // Can't wrap varargs with keyword arguments enabled
@@ -144,3 +167,5 @@ struct VarargConstructor {
   }
 };
 %}
+
+#endif // !SWIGC

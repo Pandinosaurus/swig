@@ -140,3 +140,27 @@ std::vector<std::string> RevStringVec (const std::vector<std::string> &In)
     return(result);
   }
 %}
+
+// regression test for Tcl typecheck bug with empty list fixed in 4.1.0
+%inline %{
+int sum(const std::vector<int> &v) {
+  return std::accumulate(v.begin(),v.end(),0);
+}
+int sum(int v) {
+  return v;
+}
+%}
+
+// Variables
+%inline %{
+struct VariableHolder {
+  static std::vector<int> static_variable;
+  std::vector<int> instance_variable;
+};
+std::vector<int> VariableHolder::static_variable;
+std::vector<int> global_variable;
+
+void vector_append(std::vector<int>& vec, int val) {
+  vec.push_back(val);
+}
+%}

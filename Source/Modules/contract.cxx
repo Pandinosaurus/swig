@@ -1,10 +1,10 @@
-/* ----------------------------------------------------------------------------- 
- * This file is part of SWIG, which is licensed as a whole under version 3 
+/* -----------------------------------------------------------------------------
+ * This file is part of SWIG, which is licensed as a whole under version 3
  * (or any later version) of the GNU General Public License. Some additional
  * terms also apply to certain portions of SWIG. The full details of the SWIG
  * license and copyrights can be found in the LICENSE and COPYRIGHT files
  * included with the SWIG source code as distributed by the SWIG developers
- * and at http://www.swig.org/legal.html.
+ * and at https://www.swig.org/legal.html.
  *
  * contract.cxx
  *
@@ -16,29 +16,30 @@
 /* Contract structure.  This holds rules about the different kinds of contract sections
    and their combination rules */
 
-struct contract {
+struct Contract {
   const char *section;
   const char *combiner;
 };
 /* Contract rules.  This table defines what contract sections are recognized as well as
    how contracts are to combined via inheritance */
 
-static contract Rules[] = {
+static Contract Rules[] = {
   {"require:", "&&"},
-  {"ensure:", "||"},
-  {NULL, NULL}
+  {"ensure:",  "||"},
+  {NULL,       NULL}
 };
 
 /* ----------------------------------------------------------------------------
  * class Contracts:
  *
- * This class defines the functions that need to be used in 
+ * This class defines the functions that need to be used in
  *         "wrap by contract" module.
  * ------------------------------------------------------------------------- */
 
-class Contracts:public Dispatcher {
-  String *make_expression(String *s, Node *n);
-  void substitute_parms(String *s, ParmList *p, int method);
+class Contracts : public Dispatcher {
+  String *make_expression(String *s);
+  void substitute_parms(String *s, ParmList *p, int method, String *name);
+
 public:
   Hash *ContractSplit(Node *n);
   int emit_contract(Node *n, int method);
@@ -53,8 +54,8 @@ public:
   virtual int top(Node *n);
 };
 
-static int Contract_Mode = 0;	/* contract option */
-static int InClass = 0;		/* Parsing C++ or not */
+static int Contract_Mode = 0; /* contract option */
+static int InClass = 0;       /* Parsing C++ or not */
 static int InConstructor = 0;
 static Node *CurrentClass = 0;
 
@@ -99,15 +100,15 @@ Hash *Contracts::ContractSplit(Node *n) {
       continue;
     for (int j = 0; Rules[j].section; j++) {
       if (Strstr(i.item, Rules[j].section)) {
-	if (Len(current_section)) {
-	  Setattr(result, current_section_name, current_section);
-	  current_section = Getattr(result, Rules[j].section);
-	  if (!current_section)
-	    current_section = NewString("");
-	}
-	current_section_name = Rules[j].section;
-	found = 1;
-	break;
+        if (Len(current_section)) {
+          Setattr(result, current_section_name, current_section);
+          current_section = Getattr(result, Rules[j].section);
+          if (!current_section)
+            current_section = NewString("");
+        }
+        current_section_name = Rules[j].section;
+        found = 1;
+        break;
       }
     }
     if (!found)
@@ -119,7 +120,7 @@ Hash *Contracts::ContractSplit(Node *n) {
 }
 
 /* This function looks in base classes and collects contracts found */
-void inherit_contracts(Node *c, Node *n, Hash *contracts, Hash *messages) {
+static void inherit_contracts(Node *c, Node *n, Hash *contracts, Hash *messages) {
 
   Node *b, *temp;
   String *name, *type, *local_decl, *base_decl;
@@ -145,34 +146,34 @@ void inherit_contracts(Node *c, Node *n, Hash *contracts, Hash *messages) {
     while (temp) {
       base_decl = Getattr(temp, "decl");
       if (base_decl) {
-	base_decl = SwigType_typedef_resolve_all(base_decl);
-	if ((checkAttribute(temp, "storage", "virtual")) &&
-	    (checkAttribute(temp, "name", name)) && (checkAttribute(temp, "type", type)) && (!Strcmp(local_decl, base_decl))) {
-	  /* Yes, match found. */
-	  Hash *icontracts = Getattr(temp, "contract:rules");
-	  Hash *imessages = Getattr(temp, "contract:messages");
-	  found = 1;
-	  if (icontracts && imessages) {
-	    /* Add inherited contracts and messages to the contract rules above */
-	    int j = 0;
-	    for (j = 0; Rules[j].section; j++) {
-	      String *t = Getattr(contracts, Rules[j].section);
-	      String *s = Getattr(icontracts, Rules[j].section);
-	      if (s) {
-		if (t) {
-		  Insert(t, 0, "(");
-		  Printf(t, ") %s (%s)", Rules[j].combiner, s);
-		  String *m = Getattr(messages, Rules[j].section);
-		  Printf(m, " %s [%s from %s]", Rules[j].combiner, Getattr(imessages, Rules[j].section), Getattr(b, "name"));
-		} else {
-		  Setattr(contracts, Rules[j].section, NewString(s));
-		  Setattr(messages, Rules[j].section, NewStringf("[%s from %s]", Getattr(imessages, Rules[j].section), Getattr(b, "name")));
-		}
-	      }
-	    }
-	  }
-	}
-	Delete(base_decl);
+        base_decl = SwigType_typedef_resolve_all(base_decl);
+        if ((checkAttribute(temp, "storage", "virtual")) && (checkAttribute(temp, "name", name)) && (checkAttribute(temp, "type", type)) &&
+            (!Strcmp(local_decl, base_decl))) {
+          /* Yes, match found. */
+          Hash *icontracts = Getattr(temp, "contract:rules");
+          Hash *imessages = Getattr(temp, "contract:messages");
+          found = 1;
+          if (icontracts && imessages) {
+            /* Add inherited contracts and messages to the contract rules above */
+            int j = 0;
+            for (j = 0; Rules[j].section; j++) {
+              String *t = Getattr(contracts, Rules[j].section);
+              String *s = Getattr(icontracts, Rules[j].section);
+              if (s) {
+                if (t) {
+                  Insert(t, 0, "(");
+                  Printf(t, ") %s (%s)", Rules[j].combiner, s);
+                  String *m = Getattr(messages, Rules[j].section);
+                  Printf(m, " %s [%s from %s]", Rules[j].combiner, Getattr(imessages, Rules[j].section), Getattr(b, "name"));
+                } else {
+                  Setattr(contracts, Rules[j].section, NewString(s));
+                  Setattr(messages, Rules[j].section, NewStringf("[%s from %s]", Getattr(imessages, Rules[j].section), Getattr(b, "name")));
+                }
+              }
+            }
+          }
+        }
+        Delete(base_decl);
       }
       temp = nextSibling(temp);
     }
@@ -189,7 +190,7 @@ void inherit_contracts(Node *c, Node *n, Hash *contracts, Hash *messages) {
 /* This function cleans up the assertion string by removing some extraneous characters.
    Splitting the assertion into pieces */
 
-String *Contracts::make_expression(String *s, Node *n) {
+String *Contracts::make_expression(String *s) {
   String *str_assert, *expr = 0;
   List *list_assert;
 
@@ -211,9 +212,8 @@ String *Contracts::make_expression(String *s, Node *n) {
   for (ei = First(list_assert); ei.item; ei = Next(ei)) {
     expr = ei.item;
     if (Len(expr)) {
-      Replaceid(expr, Getattr(n, "name"), Swig_cresult_name());
       if (Len(str_assert))
-	Append(str_assert, "&&");
+        Append(str_assert, "&&");
       Printf(str_assert, "(%s)", expr);
     }
   }
@@ -221,26 +221,28 @@ String *Contracts::make_expression(String *s, Node *n) {
   return str_assert;
 }
 
-/* This function substitutes parameter names for argument names in the
-   contract specification.  Note: it is assumed that the wrapper code 
-   uses arg1 for self and arg2..argn for arguments. */
+/* This function substitutes the argument names for the parameter names in the contract specification and the result
+   for the function's 'name'.  Note: it is assumed that the wrapper code uses arg1 for self and arg2..argn for
+   arguments. */
 
-void Contracts::substitute_parms(String *s, ParmList *p, int method) {
-  int argnum = 1;
-  char argname[32];
+void Contracts::substitute_parms(String *s, ParmList *p, int method, String *name) {
+  int len = ParmList_len(p);
+  int position;
 
-  if (method) {
-    Replaceid(s, "$self", "arg1");
-    argnum++;
-  }
-  while (p) {
-    sprintf(argname, "arg%d", argnum);
-    String *name = Getattr(p, "name");
-    if (name) {
-      Replaceid(s, name, argname);
-    }
-    argnum++;
-    p = nextSibling(p);
+  /* The names are replaced by position first, $0 for self, so that a replacement is not replaced too.  For example:
+       int f(int x, int arg1, int *result);
+     'x' becomes 'arg1' and the function's name 'f' becomes 'result', neither of which is then replaced again.  A member
+     with the name of a parameter or of the function, such as the 'n' in 'p->n', is left alone. */
+  if (method)
+    Replaceid(s, "$self", "$0");
+  ParmList_replace_expression_names_positional(s, p, 0);
+  Swig_replace_expression_identifier(s, name, Swig_cresult_name());
+  for (position = method ? 0 : 1; position <= len; position++) {
+    String *dollar = NewStringf("$%d", position);
+    String *argname = NewStringf("arg%d", position + method);
+    Replace(s, dollar, argname, DOH_REPLACE_NUMBER_END);
+    Delete(argname);
+    Delete(dollar);
   }
 }
 
@@ -270,8 +272,8 @@ int Contracts::emit_contract(Node *n, int method) {
   /* Take the different contract expressions and clean them up a bit */
   Iterator i;
   for (i = First(contracts); i.item; i = Next(i)) {
-    String *e = make_expression(i.item, n);
-    substitute_parms(e, cparms, method);
+    String *e = make_expression(i.item);
+    substitute_parms(e, cparms, method, Getattr(n, "name"));
     Setattr(contracts, i.key, e);
 
     /* Make a string containing error messages */

@@ -28,3 +28,62 @@ int sumA(int *nums[3]) {
   return sum;
 }
 %}
+
+// Check $1_size parenthesises array dimensions that are expressions
+%typemap(in) int grid[ANY][ANY] (int temp[$1_dim0][$1_dim1]) {
+  temp[0][0] = $1_size;
+  $1 = temp;
+}
+%typemap(in) int row[ANY] (int temp[$1_dim0]) {
+  temp[0] = 2 * $1_size;
+  $1 = temp;
+}
+%typemap(freearg) int row[ANY] ""
+
+%inline %{
+#define GRID_DIM 2
+int gridSize(int grid[GRID_DIM + 1][GRID_DIM + 2]) {
+  return grid[0][0];
+}
+int rowSize(int row[GRID_DIM + 1]) {
+  return row[0];
+}
+%}
+
+// Check $1_dim10 is not replaced as $1_dim1 followed by 0
+%{
+static int manyDimsSeen = 0;
+%}
+%typemap(in, numinputs=0) int many[ANY][ANY][ANY][ANY][ANY][ANY][ANY][ANY][ANY][ANY][ANY] {
+  manyDimsSeen = $1_dim10 * 100 + $1_dim1;
+  $1 = 0;
+}
+%typemap(freearg) int many[ANY][ANY][ANY][ANY][ANY][ANY][ANY][ANY][ANY][ANY][ANY] ""
+
+%inline %{
+int manyDims(int many[1][2][1][1][1][1][1][1][1][1][3]) {
+  (void)many;
+  return manyDimsSeen;
+}
+%}
+
+// Check an [ANY] typemap and $1_dim0 for an array size that contains a '.'
+%{
+static int dottedSeen = 0;
+struct DotSizes {
+  int x[5];
+};
+DotSizes dotSizes;
+%}
+%typemap(in, numinputs=0) int dotted[ANY] {
+  dottedSeen = (int)$1_dim0;
+  $1 = 0;
+}
+%typemap(freearg) int dotted[ANY] ""
+
+%inline %{
+int dottedDim(int dotted[sizeof(dotSizes.x) / sizeof(int)]) {
+  (void)dotted;
+  return dottedSeen;
+}
+%}

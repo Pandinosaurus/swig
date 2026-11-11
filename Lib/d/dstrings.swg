@@ -37,13 +37,43 @@
  * char array typemaps.
  */
 
-%typemap(in) char[ANY], char[] %{ $1 = ($1_ltype)$input; %}
-%typemap(out) char[ANY], char[] %{ $result = SWIG_d_string_callback((const char *)$1); %}
+%typemap(in, canthrow=1, fragment="SWIG_CopyCharArray") char[ANY] (char temp[$1_dim0])
+%{ $1 = 0;
+   if ($input) {
+     if (!SWIG_CopyCharArray(temp, $1_dim0, $input, strlen($input))) {
+       SWIG_DSetPendingException(SWIG_DIllegalArgumentException, "string too long for char array");
+       return $null;
+     }
+     $1 = ($1_ltype)temp;
+   } %}
+/* A C99 variable length array parameter, as in 'int n, char s[n]' */
+%typemap(in, canthrow=1, fragment="SWIG_NewCharArray") char[*]
+%{ $1 = 0;
+   if ($input) {
+     $1 = ($1_ltype)(($1_dim0) > 0 ? SWIG_NewCharArray((size_t)($1_dim0), $input, strlen($input)) : 0);
+     if (!$1) {
+       SWIG_DSetPendingException(SWIG_DIllegalArgumentException, "string too long for char array");
+       return $null;
+     }
+   } %}
+%typemap(freearg) char[*] %{ free((char *)$1); %}
+%typemap(in) char[] %{ $1 = ($1_ltype)$input; %}
+%typemap(out, fragment="SWIG_CharArrayString") char[ANY] %{ {
+     const char *swig_str = SWIG_CharArrayString((const char *)$1, $1_dim0);
+     $result = SWIG_d_string_callback(swig_str);
+     SWIG_DeleteCharArrayString(swig_str, (const char *)$1);
+   } %}
+%typemap(out) char[] %{ $result = SWIG_d_string_callback((const char *)$1); %}
 
 %typemap(directorout) char[ANY], char[] %{ $result = ($1_ltype)$input; %}
-%typemap(directorin) char[ANY], char[] %{ $input = SWIG_d_string_callback((const char *)$1); %}
+%typemap(directorin, fragment="SWIG_CharArrayString") char[ANY] %{ {
+     const char *swig_str = SWIG_CharArrayString((const char *)$1, $1_dim0);
+     $input = SWIG_d_string_callback(swig_str);
+     SWIG_DeleteCharArrayString(swig_str, (const char *)$1);
+   } %}
+%typemap(directorin) char[] %{ $input = SWIG_d_string_callback((const char *)$1); %}
 
-%typemap(ddirectorin) char[ANY], char[] "$winput"
+%typemap(ddirectorin) char[ANY], char[] "FROM_STRINGZ($winput)"
 %typemap(ddirectorout) char[ANY], char[] "$dcall"
 
 
@@ -64,17 +94,23 @@
 
 // We need to have the \0-terminated string conversion functions available in
 // the D proxy modules.
-#if (SWIG_D_VERSION == 1)
-// Could be easily extended to support Phobos as well.
-SWIGD_STRING_TYPEMAPS(char*, char[], tango.stdc.stringz.fromStringz, tango.stdc.stringz.toStringz)
-
-%pragma(d) globalproxyimports = "static import tango.stdc.stringz;";
-#else
 SWIGD_STRING_TYPEMAPS(const(char)*, string, std.conv.to!string, std.string.toStringz)
 
 %pragma(d) globalproxyimports = %{
 static import std.conv;
 static import std.string;
 %}
-#endif
 #undef SWIGD_STRING_TYPEMAPS
+
+%apply char[ANY] { char (&)[ANY], char (&&)[ANY] }
+/* Unlike for a char array, NULL is not accepted, as a reference cannot be bound to NULL */
+%typemap(in, canthrow=1, fragment="SWIG_CopyCharArray") char (&)[ANY] (char temp[$1_dim0]), char (&&)[ANY] (char temp[$1_dim0])
+%{ if (!$input) {
+     SWIG_DSetPendingException(SWIG_DNullReferenceException, "$1_type is null");
+     return $null;
+   }
+   if (!SWIG_CopyCharArray(temp, $1_dim0, $input, strlen($input))) {
+     SWIG_DSetPendingException(SWIG_DIllegalArgumentException, "string too long for char array");
+     return $null;
+   }
+   $1 = ($1_ltype)temp; %}

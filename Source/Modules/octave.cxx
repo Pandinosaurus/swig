@@ -4,7 +4,7 @@
  * terms also apply to certain portions of SWIG. The full details of the SWIG
  * license and copyrights can be found in the LICENSE and COPYRIGHT files
  * included with the SWIG source code as distributed by the SWIG developers
- * and at http://www.swig.org/legal.html.
+ * and at https://www.swig.org/legal.html.
  *
  * octave.cxx
  *
@@ -15,7 +15,7 @@
 #include "cparse.h"
 
 static String *global_name = 0;
-static String *op_prefix   = 0;
+static String *op_prefix = 0;
 
 static const char *usage = "\
 Octave Options (available with -octave)\n\
@@ -24,8 +24,7 @@ Octave Options (available with -octave)\n\
      -opprefix <str> - Prefix <str> for global operator functions [default: 'op_']\n\
 \n";
 
-
-class OCTAVE:public Language {
+class OCTAVE : public Language {
 private:
   File *f_begin;
   File *f_runtime;
@@ -50,14 +49,13 @@ private:
     if (dld) {
       String *tname = texinfo_name(n, "std::string()");
       Printf(f, "SWIG_DEFUN( %s, %s, %s ) {", cname, wname, tname);
-    }
-    else {
+    } else {
       Printf(f, "static octave_value_list %s (const octave_value_list& args, int nargout) {", wname);
     }
   }
 
 public:
-  OCTAVE():
+  OCTAVE() :
     f_begin(0),
     f_runtime(0),
     f_header(0),
@@ -73,19 +71,22 @@ public:
     have_constructor(0),
     have_destructor(0),
     constructor_name(0),
-    docs(0)
-  {
+    docs(0) {
     /* Add code to manage protected constructors and directors */
     director_prot_ctor_code = NewString("");
     Printv(director_prot_ctor_code,
-           "if ( $comparison ) { /* subclassed */\n",
-           "  $director_new \n",
-           "} else {\n", "  error(\"accessing abstract class or protected constructor\"); \n", "  SWIG_fail;\n", "}\n", NIL);
+           "if ($comparison) { /* subclassed */\n",
+           "  $director_new\n",
+           "} else {\n",
+           "  error(\"accessing abstract class or protected constructor\");\n",
+           "  SWIG_fail;\n",
+           "}\n",
+           NIL);
 
     enable_cplus_runtime_mode();
     allow_overloading();
     director_multiple_inheritance = 1;
-    director_language = 1;
+    directorLanguage();
     docs = NewHash();
   }
 
@@ -113,13 +114,13 @@ public:
           } else {
             Swig_arg_error();
           }
-	} else if (strcmp(argv[i], "-cppcast") == 0) {
-	  Printf(stderr, "Deprecated command line option: %s. This option is now always on.\n", argv[i]);
-	  Swig_mark_arg(i);
-	} else if (strcmp(argv[i], "-nocppcast") == 0) {
-	  Printf(stderr, "Deprecated command line option: %s. This option is no longer supported.\n", argv[i]);
-	  Swig_mark_arg(i);
-	  SWIG_exit(EXIT_FAILURE);
+        } else if (strcmp(argv[i], "-cppcast") == 0) {
+          Printf(stderr, "Deprecated command line option: %s. This option is now always on.\n", argv[i]);
+          Swig_mark_arg(i);
+        } else if (strcmp(argv[i], "-nocppcast") == 0) {
+          Printf(stderr, "Deprecated command line option: %s. This option is no longer supported.\n", argv[i]);
+          Swig_mark_arg(i);
+          Exit(EXIT_FAILURE);
         }
       }
     }
@@ -132,7 +133,6 @@ public:
     SWIG_library_directory("octave");
     Preprocessor_define("SWIGOCTAVE 1", 0);
     SWIG_config_file("octave.swg");
-    SWIG_typemap_lang("octave");
     allow_overloading();
 
     // Octave API is C++, so output must be C++ compatible even when wrapping C code
@@ -167,7 +167,7 @@ public:
     f_begin = NewFile(outfile, "w", SWIG_output_files());
     if (!f_begin) {
       FileErrorDisplay(outfile);
-      SWIG_exit(EXIT_FAILURE);
+      Exit(EXIT_FAILURE);
     }
     f_runtime = NewString("");
     f_header = NewString("");
@@ -190,7 +190,7 @@ public:
 
     Swig_banner(f_begin);
 
-    Printf(f_runtime, "\n\n#ifndef SWIGOCTAVE\n#define SWIGOCTAVE\n#endif\n\n");
+    Swig_obligatory_macros(f_runtime, "OCTAVE");
 
     Printf(f_runtime, "#define SWIG_name_d      \"%s\"\n", module);
     Printf(f_runtime, "#define SWIG_name        %s\n", module);
@@ -199,7 +199,7 @@ public:
     Printf(f_runtime, "#define SWIG_global_name      \"%s\"\n", global_name);
     Printf(f_runtime, "#define SWIG_op_prefix        \"%s\"\n", op_prefix);
 
-    if (directorsEnabled()) {
+    if (Swig_directors_enabled()) {
       Printf(f_runtime, "#define SWIG_DIRECTORS\n");
       Swig_banner(f_directors_h);
       if (dirprot_mode()) {
@@ -214,17 +214,17 @@ public:
     Printf(f_init, "static bool SWIG_init_user(octave_swig_type* module_ns)\n{\n");
 
     if (!CPlusPlus)
-      Printf(f_header,"extern \"C\" {\n");
+      Printf(f_header, "extern \"C\" {\n");
 
     Language::top(n);
 
     if (!CPlusPlus)
-      Printf(f_header,"}\n");
+      Printf(f_header, "}\n");
 
     if (Len(docs))
       emit_doc_texinfo();
 
-    if (directorsEnabled()) {
+    if (Swig_directors_enabled()) {
       Swig_insert_file("director_common.swg", f_runtime);
       Swig_insert_file("director.swg", f_runtime);
     }
@@ -237,7 +237,7 @@ public:
     Dump(f_runtime, f_begin);
     Dump(f_header, f_begin);
     Dump(f_doc, f_begin);
-    if (directorsEnabled()) {
+    if (Swig_directors_enabled()) {
       Dump(f_directors_h, f_begin);
       Dump(f_directors, f_begin);
     }
@@ -260,11 +260,11 @@ public:
   }
 
   String *texinfo_escape(String *_s) {
-    const char* s=(const char*)Data(_s);
-    while (*s&&(*s=='\t'||*s=='\r'||*s=='\n'||*s==' '))
+    const char *s = (const char *)Data(_s);
+    while (*s && (*s == '\t' || *s == '\r' || *s == '\n' || *s == ' '))
       ++s;
     String *r = NewString("");
-    for (int j=0;s[j];++j) {
+    for (int j = 0; s[j]; ++j) {
       if (s[j] == '\n') {
         Append(r, "\\n\\\n");
       } else if (s[j] == '\r') {
@@ -295,35 +295,34 @@ public:
       Printv(doc_str, synopsis, decl_info, cdecl_info, args_info, NIL);
       String *escaped_doc_str = texinfo_escape(doc_str);
 
-      if (Len(doc_str)>0) {
-        Printf(f_doc,"static const char* %s_texinfo = ",wrap_name);
-        Printf(f_doc,"\"-*- texinfo -*-\\n\\\n%s", escaped_doc_str);
+      if (Len(doc_str) > 0) {
+        Printf(f_doc, "static const char* %s_texinfo = ", wrap_name);
+        Printf(f_doc, "\"-*- texinfo -*-\\n\\\n%s", escaped_doc_str);
         if (Len(decl_info))
-          Printf(f_doc,"\\n\\\n@end deftypefn");
-        Printf(f_doc,"\";\n");
+          Printf(f_doc, "\\n\\\n@end deftypefn");
+        Printf(f_doc, "\";\n");
       }
 
       Delete(escaped_doc_str);
       Delete(doc_str);
       Delete(wrap_name);
     }
-    Printf(f_doc,"\n");
+    Printf(f_doc, "\n");
   }
-  bool is_empty_doc_node(Node* n) {
+  bool is_empty_doc_node(Node *n) {
     if (!n)
       return true;
     String *synopsis = Getattr(n, "synopsis");
     String *decl_info = Getattr(n, "decl_info");
     String *cdecl_info = Getattr(n, "cdecl_info");
     String *args_info = Getattr(n, "args_info");
-    return !Len(synopsis) && !Len(decl_info) &&
-      !Len(cdecl_info) && !Len(args_info);
+    return !Len(synopsis) && !Len(decl_info) && !Len(cdecl_info) && !Len(args_info);
   }
-  String *texinfo_name(Node* n, const char* defval = "0") {
+  String *texinfo_name(Node *n, const char *defval = "0") {
     String *tname = NewString("");
     String *iname = Getattr(n, "sym:name");
     String *wname = Swig_name_wrapper(iname);
-    Node* d = Getattr(docs, wname);
+    Node *d = Getattr(docs, wname);
 
     if (is_empty_doc_node(d))
       Printf(tname, defval);
@@ -338,13 +337,13 @@ public:
     String *wname = Swig_name_wrapper(iname);
     String *str = Getattr(n, "feature:docstring");
     bool autodoc_enabled = !Cmp(Getattr(n, "feature:autodoc"), "1");
-    Node* d = Getattr(docs, wname);
+    Node *d = Getattr(docs, wname);
     if (!d) {
       d = NewHash();
-      Setattr(d, "synopsis", NewString(""));
-      Setattr(d, "decl_info", NewString(""));
-      Setattr(d, "cdecl_info", NewString(""));
-      Setattr(d, "args_info", NewString(""));
+      Setattr(d, "synopsis", "");
+      Setattr(d, "decl_info", "");
+      Setattr(d, "cdecl_info", "");
+      Setattr(d, "args_info", "");
       Setattr(docs, wname, d);
     }
 
@@ -418,14 +417,14 @@ public:
    *   The "lname" attribute in each parameter in plist will be contain a parameter name
    * ----------------------------------------------------------------------------- */
 
-  void addMissingParameterNames(Node* n, ParmList *plist, int arg_offset) {
+  void addMissingParameterNames(Node *n, ParmList *plist, int arg_offset) {
     Parm *p = plist;
     int i = arg_offset;
     while (p) {
       if (!Getattr(p, "lname")) {
-	String *name = makeParameterName(n, p, i);
-	Setattr(p, "lname", name);
-	Delete(name);
+        String *name = makeParameterName(n, p, i);
+        Setattr(p, "lname", name);
+        Delete(name);
       }
       i++;
       p = nextSibling(p);
@@ -439,7 +438,7 @@ public:
     Parm *pnext;
     int arg_num = is_wrapping_class() ? 1 : 0;
 
-    addMissingParameterNames(n, plist, arg_num); // for $1_name substitutions done in Swig_typemap_attach_parms
+    addMissingParameterNames(n, plist, arg_num);  // for $1_name substitutions done in Swig_typemap_attach_parms
 
     Swig_typemap_attach_parms("in", plist, 0);
     Swig_typemap_attach_parms("doc", plist, 0);
@@ -468,7 +467,7 @@ public:
 
       String *made_name = 0;
       if (!name) {
-	name = made_name = makeParameterName(n, p, arg_num);
+        name = made_name = makeParameterName(n, p, arg_num);
       }
 
       type = type ? type : Getattr(p, "type");
@@ -488,7 +487,7 @@ public:
       Append(decl_str, tex_name);
 
       if (value) {
-        String *new_value = convertValue(value, Getattr(p, "type"));
+        String *new_value = convertValue(value, Getattr(p, "numval"), Getattr(p, "stringval"), Getattr(p, "type"));
         if (new_value) {
           value = new_value;
         } else {
@@ -497,6 +496,7 @@ public:
             value = Getattr(lookup, "sym:name");
         }
         Printf(decl_str, " = %s", value);
+        Delete(new_value);
       }
 
       Node *nn = classLookup(Getattr(p, "type"));
@@ -516,24 +516,81 @@ public:
    * convertValue()
    *    Check if string v can be an Octave value literal,
    *    (eg. number or string), or translate it to an Octave literal.
+   *    A null pointer is written as the empty matrix '[]', which is what
+   *    the Octave runtime converts to and from a null pointer.
    * ------------------------------------------------------------ */
-  String *convertValue(String *v, SwigType *t) {
-    if (v && Len(v) > 0) {
-      char fc = (Char(v))[0];
-      if (('0' <= fc && fc <= '9') || '\'' == fc || '"' == fc) {
-        /* number or string (or maybe NULL pointer) */
-        if (SwigType_ispointer(t) && Strcmp(v, "0") == 0)
-          return NewString("None");
-        else
-          return v;
-      }
-      if (Strcmp(v, "NULL") == 0 || Strcmp(v, "nullptr") == 0)
-        return SwigType_ispointer(t) ? NewString("nil") : NewString("0");
-      if (Strcmp(v, "true") == 0 || Strcmp(v, "TRUE") == 0)
-        return NewString("true");
-      if (Strcmp(v, "false") == 0 || Strcmp(v, "FALSE") == 0)
-        return NewString("false");
+  String *convertValue(String *v, String *numval, String *stringval, SwigType *type) {
+    if (stringval) {
+      return NewStringf("\"%(escape)s\"", stringval);
     }
+    SwigType *resolved_type = SwigType_typedef_resolve_all(type);
+    SwigType *unqualified_type = NIL;
+    if (SwigType_isreference(resolved_type)) {
+      SwigType *t = Copy(resolved_type);
+      t = SwigType_del_reference(t);
+      unqualified_type = SwigType_strip_qualifiers(t);
+      Delete(t);
+    } else {
+      unqualified_type = SwigType_strip_qualifiers(resolved_type);
+    }
+    if (numval) {
+      if (SwigType_type(unqualified_type) == T_BOOL) {
+        Delete(resolved_type);
+        Delete(unqualified_type);
+        return NewString(*Char(numval) == '0' ? "false" : "true");
+      }
+      if (SwigType_ispointer(unqualified_type) && Equal(numval, "0")) {
+        Delete(resolved_type);
+        Delete(unqualified_type);
+        return NewString("[]");
+      }
+      Delete(resolved_type);
+      Delete(unqualified_type);
+      return Copy(numval);
+    }
+    if (Equal(v, "nullptr")) {
+      // nullptr is type nullptr_t which doesn't implicitly convert to 0.
+      Delete(resolved_type);
+      Delete(unqualified_type);
+      return NewString("[]");
+    }
+    if (Equal(v, "NULL")) {
+      // The C and C++ standards both allow the implementation to define NULL
+      // to `0`, and the inadvertent use of NULL as an integer zero is
+      // sometimes seen in code.
+      //
+      // However this use is semantically wrong, and GCC and clang both
+      // define NULL to a magic value which warns if implicitly converted
+      // to an integer, so we only implicitly convert to zero if the type
+      // resolves to a built-in arithmetic type.
+      switch (SwigType_type(unqualified_type)) {
+      case T_INT:
+      case T_LONG:
+      case T_SHORT:
+      case T_UINT:
+      case T_USHORT:
+      case T_ULONG:
+      case T_CHAR:
+      case T_SCHAR:
+      case T_UCHAR:
+      case T_WCHAR:
+      case T_FLOAT:
+      case T_DOUBLE:
+      case T_LONGDOUBLE:
+      case T_BOOL:
+      case T_LONGLONG:
+      case T_ULONGLONG:
+        Delete(resolved_type);
+        Delete(unqualified_type);
+        return NewString("0");
+      default:
+        Delete(resolved_type);
+        Delete(unqualified_type);
+        return NewString("[]");
+      }
+    }
+    Delete(resolved_type);
+    Delete(unqualified_type);
     return 0;
   }
 
@@ -552,7 +609,7 @@ public:
     String *iname = Getattr(n, "sym:name");
     String *wname = Swig_name_wrapper(iname);
     String *overname = Copy(wname);
-    SwigType *d = Getattr(n, "type");
+    SwigType *returntype = Getattr(n, "type");
     ParmList *l = Getattr(n, "parms");
 
     if (!overloaded && !addSymbol(iname, n))
@@ -572,7 +629,7 @@ public:
     Printf(f->code, "try {\n");
 
     emit_parameter_variables(l, f);
-    emit_attach_parmmaps(l, f);
+    emit_attach_parm_typemaps(l, f);
     Setattr(n, "wrap:parms", l);
 
     int num_arguments = emit_num_arguments(l);
@@ -580,8 +637,13 @@ public:
     int varargs = emit_isvarargs(l);
     char source[64];
 
-    Printf(f->code, "if (!SWIG_check_num_args(\"%s\",args.length(),%i,%i,%i)) "
-           "{\n SWIG_fail;\n }\n", iname, num_arguments, num_required, varargs);
+    Printf(f->code,
+           "if (!SWIG_check_num_args(\"%s\",args.length(),%i,%i,%i)) "
+           "{\n SWIG_fail;\n }\n",
+           iname,
+           num_arguments,
+           num_required,
+           varargs);
 
     if (constructor && num_arguments == 1 && num_required == 1) {
       if (Cmp(storage, "explicit") == 0) {
@@ -595,9 +657,7 @@ public:
     }
 
     for (j = 0, p = l; j < num_arguments; ++j) {
-      while (checkAttribute(p, "tmap:in:numinputs", "0")) {
-        p = Getattr(p, "tmap:in:next");
-      }
+      p = emit_ignored_in_typemaps(p, f->code);
 
       SwigType *pt = Getattr(p, "type");
 
@@ -608,7 +668,7 @@ public:
           continue;
         }
 
-        sprintf(source, "args(%d)", j);
+        snprintf(source, sizeof(source), "args(%d)", j);
         Setattr(p, "emit:input", source);
 
         Replaceall(tm, "$input", Getattr(p, "emit:input"));
@@ -644,6 +704,7 @@ public:
         break;
       }
     }
+    p = emit_ignored_in_typemaps(p, f->code);
 
     // Check for trailing varargs
     if (varargs) {
@@ -708,7 +769,12 @@ public:
 
     Setattr(n, "wrap:name", overname);
 
-    Swig_director_emit_dynamic_cast(n, f);
+    if (Swig_director_emit_dynamic_cast(n, f)) {
+      /* Add protection */
+      Append(f->code, "if (!darg) {\n");
+      Append(f->code, "  SWIG_exception_fail(SWIG_NullReferenceError, \"'self' is not a director\");\n");
+      Append(f->code, "}\n");
+    }
     String *actioncode = emit_action(n);
 
     Wrapper_add_local(f, "_out", "octave_value_list _out");
@@ -725,12 +791,14 @@ public:
         Replaceall(tm, "$owner", "0");
 
       Printf(f->code, "%s\n", tm);
-      Printf(f->code, "if (_outv.is_defined()) _outp = " "SWIG_Octave_AppendOutput(_outp, _outv);\n");
+      Printf(f->code,
+             "if (_outv.is_defined()) _outp = "
+             "SWIG_Octave_AppendOutput(_outp, _outv);\n");
       Delete(tm);
     } else {
-      Swig_warning(WARN_TYPEMAP_OUT_UNDEF, input_file, line_number, "Unable to use return type %s in function %s.\n", SwigType_str(d, 0), iname);
+      Swig_warning(WARN_TYPEMAP_OUT_UNDEF, input_file, line_number, "Unable to use return type %s in function %s.\n", SwigType_str(returntype, 0), iname);
     }
-    emit_return_variable(n, d, f);
+    emit_return_variable(n, returntype, f);
 
     Printv(f->code, outarg, NIL);
     Printv(f->code, cleanup, NIL);
@@ -767,6 +835,9 @@ public:
     /* Substitute the cleanup code */
     Replaceall(f->code, "$cleanup", cleanup);
 
+    bool isvoid = !Cmp(returntype, "void");
+    emit_isvoid_special_variables(n, f->code, isvoid);
+
     Replaceall(f->code, "$symname", iname);
     Wrapper_print(f, f_wrappers);
     DelWrapper(f);
@@ -794,16 +865,19 @@ public:
     String *iname = Getattr(n, "sym:name");
     String *wname = Swig_name_wrapper(iname);
     int maxargs;
-    String *dispatch = Swig_overload_dispatch(n, "return %s(args, nargout);", &maxargs);
+    bool check_emitted = false;
+    String *dispatch = Swig_overload_dispatch(n, "return %s(args, nargout);", &maxargs, &check_emitted);
     String *tmp = NewString("");
 
     Octave_begin_function(n, f->def, iname, wname, true);
     Wrapper_add_local(f, "argc", "int argc = args.length()");
-    Printf(tmp, "octave_value_ref argv[%d]={", maxargs);
-    for (int j = 0; j < maxargs; ++j)
-      Printf(tmp, "%soctave_value_ref(args,%d)", j ? "," : " ", j);
-    Printf(tmp, "}");
-    Wrapper_add_local(f, "argv", tmp);
+    if (maxargs > 0 && check_emitted) {
+      Printf(tmp, "octave_value_ref argv[%d]={", maxargs);
+      for (int j = 0; j < maxargs; ++j)
+        Printf(tmp, "%soctave_value_ref(args,%d)", j ? "," : " ", j);
+      Printf(tmp, "}");
+      Wrapper_add_local(f, "argv", tmp);
+    }
     Printv(f->code, dispatch, "\n", NIL);
     Printf(f->code, "error(\"No matching function for overload\");\n");
     Printf(f->code, "return octave_value_list();\n");
@@ -835,8 +909,8 @@ public:
     String *setwname = Swig_name_wrapper(setname);
 
     Octave_begin_function(n, setf->def, setname, setwname, true);
-    Printf(setf->code, "if (!SWIG_check_num_args(\"%s_set\",args.length(),1,1,0)) return octave_value_list();", iname);
-    if (is_assignable(n)) {
+    Printf(setf->code, "if (!SWIG_check_num_args(\"%s_set\",args.length(),1,1,0)) return octave_value_list();\n", iname);
+    if (!is_immutable(n)) {
       Setattr(n, "wrap:name", setname);
       if ((tm = Swig_typemap_lookup("varin", n, name, 0))) {
         Replaceall(tm, "$input", "args(0)");
@@ -890,8 +964,7 @@ public:
     String *name = Getattr(n, "name");
     String *iname = Getattr(n, "sym:name");
     SwigType *type = Getattr(n, "type");
-    String *rawval = Getattr(n, "rawval");
-    String *value = rawval ? rawval : Getattr(n, "value");
+    String *value = Getattr(n, "value");
     String *cppvalue = Getattr(n, "cppvalue");
     String *tm;
 
@@ -946,7 +1019,7 @@ public:
     // This is a bug, due to the fact that swig_type -> octave_class mapping
     // is 1-to-n.
     static Hash *emitted = NewHash();
-    String *mangled_classname = Swig_name_mangle(Getattr(n, "name"));
+    String *mangled_classname = Swig_name_mangle_type(Getattr(n, "name"));
     if (Getattr(emitted, mangled_classname)) {
       Delete(mangled_classname);
       return SWIG_NOWRAP;
@@ -964,13 +1037,14 @@ public:
     SwigType_add_pointer(t);
 
     // Replace storing a pointer to underlying class with a smart pointer (intended for use with non-intrusive smart pointers)
-    SwigType *smart = Swig_cparse_smartptr(n);
+    SwigType *smart = Getattr(n, "smart");
     String *wrap_class = NewStringf("&_wrap_class_%s", class_name);
     if (smart) {
-      SwigType_add_pointer(smart);
-      SwigType_remember_clientdata(smart, wrap_class);
+      SwigType *psmart = Copy(smart);
+      SwigType_add_pointer(psmart);
+      SwigType_remember_clientdata(psmart, wrap_class);
+      Delete(psmart);
     }
-    //String *wrap_class = NewStringf("&_wrap_class_%s", class_name);
     SwigType_remember_clientdata(t, wrap_class);
 
     int use_director = Swig_directorclass(n);
@@ -1003,7 +1077,6 @@ public:
     List *baselist = Getattr(n, "bases");
     if (baselist && Len(baselist)) {
       Iterator b;
-      int index = 0;
       b = First(baselist);
       while (b.item) {
         String *bname = Getattr(b.item, "name");
@@ -1016,7 +1089,6 @@ public:
         Printf(base_class_names, "\"%s\",", bname_mangled);
         Printf(base_class, "0,");
         b = Next(b);
-        index++;
         Delete(bname_mangled);
       }
     }
@@ -1049,7 +1121,6 @@ public:
 
     Delete(base_class);
     Delete(base_class_names);
-    Delete(smart);
     Delete(t);
     Delete(s_members_tab);
     s_members_tab = 0;
@@ -1075,8 +1146,7 @@ public:
       bool overloaded = !!Getattr(n, "sym:overloaded");
       if (overloaded)
         Delslice(rname, Len(rname) - Len(Getattr(n, "sym:overname")), DOH_END);
-      Printf(s_members_tab, "{\"%s\",%s,0,0,0,%s},\n",
-             realname, rname, tname);
+      Printf(s_members_tab, "{\"%s\",%s,0,0,0,%s},\n", realname, rname, tname);
       Delete(rname);
       Delete(tname);
     }
@@ -1126,7 +1196,6 @@ public:
       if (parms)
         set_nextSibling(self, parms);
       Setattr(n, "parms", self);
-      Setattr(n, "wrap:self", "1");
       Setattr(n, "hidden", "1");
       Delete(self);
     }
@@ -1156,8 +1225,7 @@ public:
       bool overloaded = !!Getattr(n, "sym:overloaded");
       if (overloaded)
         Delslice(rname, Len(rname) - Len(Getattr(n, "sym:overname")), DOH_END);
-      Printf(s_members_tab, "{\"%s\",%s,0,0,1,%s},\n",
-             realname, rname, tname);
+      Printf(s_members_tab, "{\"%s\",%s,0,0,1,%s},\n", realname, rname, tname);
       Delete(rname);
       Delete(tname);
     }
@@ -1234,7 +1302,13 @@ public:
         String *basetype = Getattr(parent, "classtype");
         String *target = Swig_method_decl(0, decl, classname, parms, 0);
         call = Swig_csuperclass_call(0, basetype, superparms);
-        Printf(w->def, "%s::%s: %s," "\nSwig::Director(static_cast<%s*>(this)) { \n", classname, target, call, basetype);
+        Printf(w->def,
+               "%s::%s: %s,"
+               "\nSwig::Director(static_cast<%s*>(this)) { \n",
+               classname,
+               target,
+               call,
+               basetype);
         Append(w->def, "}\n");
         Delete(target);
         Wrapper_print(w, f_directors);
@@ -1261,8 +1335,12 @@ public:
     String *classname = Swig_class_name(n);
     {
       Wrapper *w = NewWrapper();
-      Printf(w->def, "SwigDirector_%s::SwigDirector_%s(void* self) :"
-             "\nSwig::Director((octave_swig_type*)self,static_cast<%s*>(this)) { \n", classname, classname, classname);
+      Printf(w->def,
+             "SwigDirector_%s::SwigDirector_%s(void* self) :"
+             "\nSwig::Director((octave_swig_type*)self,static_cast<%s*>(this)) { \n",
+             classname,
+             classname,
+             classname);
       Append(w->def, "}\n");
       Wrapper_print(w, f_directors);
       DelWrapper(w);
@@ -1276,7 +1354,7 @@ public:
     int is_void = 0;
     int is_pointer = 0;
     String *decl = Getattr(n, "decl");
-    String *returntype = Getattr(n, "type");
+    SwigType *returntype = Getattr(n, "type");
     String *name = Getattr(n, "name");
     String *classname = Getattr(parent, "sym:name");
     String *c_classname = Getattr(parent, "name");
@@ -1308,48 +1386,17 @@ public:
     String *pclassname = NewStringf("SwigDirector_%s", classname);
     String *qualified_name = NewStringf("%s::%s", pclassname, name);
     SwigType *rtype = Getattr(n, "conversion_operator") ? 0 : Getattr(n, "classDirectorMethods:type");
-    target = Swig_method_decl(rtype, decl, qualified_name, l, 0);
+    String *exception_specification = Swig_director_exception_specification(n);
+    target = Swig_method_decl(rtype, decl, qualified_name, l, 0, exception_specification);
     Printf(w->def, "%s", target);
     Delete(qualified_name);
     Delete(target);
 
     // header declaration
-    target = Swig_method_decl(rtype, decl, name, l, 1);
+    target = Swig_method_decl(rtype, decl, name, l, 1, exception_specification);
     Printf(declaration, "    virtual %s", target);
     Delete(target);
-
-    // Get any exception classes in the throws typemap
-    if (Getattr(n, "noexcept")) {
-      Append(w->def, " noexcept");
-      Append(declaration, " noexcept");
-    }
-    ParmList *throw_parm_list = 0;
-
-    if ((throw_parm_list = Getattr(n, "throws")) || Getattr(n, "throw")) {
-      Parm *p;
-      int gencomma = 0;
-
-      Append(w->def, " throw(");
-      Append(declaration, " throw(");
-
-      if (throw_parm_list)
-        Swig_typemap_attach_parms("throws", throw_parm_list, 0);
-      for (p = throw_parm_list; p; p = nextSibling(p)) {
-        if (Getattr(p, "tmap:throws")) {
-          if (gencomma++) {
-            Append(w->def, ", ");
-            Append(declaration, ", ");
-          }
-          String *str = SwigType_str(Getattr(p, "type"), 0);
-          Append(w->def, str);
-          Append(declaration, str);
-          Delete(str);
-        }
-      }
-
-      Append(w->def, ")");
-      Append(declaration, ")");
-    }
+    Delete(exception_specification);
 
     Append(w->def, " {");
     Append(declaration, ";\n");
@@ -1359,17 +1406,17 @@ public:
     // handle it, including declaration of c_result ($result).
     if (!is_void && (!ignored_method || pure_virtual)) {
       if (!SwigType_isclass(returntype)) {
-	if (!(SwigType_ispointer(returntype) || SwigType_isreference(returntype))) {
-	  String *construct_result = NewStringf("= SwigValueInit< %s >()", SwigType_lstr(returntype, 0));
-	  Wrapper_add_localv(w, "c_result", SwigType_lstr(returntype, "c_result"), construct_result, NIL);
-	  Delete(construct_result);
-	} else {
-	  Wrapper_add_localv(w, "c_result", SwigType_lstr(returntype, "c_result"), "= 0", NIL);
-	}
+        if (!(SwigType_ispointer(returntype) || SwigType_isreference(returntype))) {
+          String *construct_result = NewStringf("= SwigValueInit< %s >()", SwigType_lstr(returntype, 0));
+          Wrapper_add_localv(w, "c_result", SwigType_lstr(returntype, "c_result"), construct_result, NIL);
+          Delete(construct_result);
+        } else {
+          Wrapper_add_localv(w, "c_result", SwigType_lstr(returntype, "c_result"), "= 0", NIL);
+        }
       } else {
-	String *cres = SwigType_lstr(returntype, "c_result");
-	Printf(w->code, "%s;\n", cres);
-	Delete(cres);
+        String *cres = SwigType_lstr(returntype, "c_result");
+        Printf(w->code, "%s;\n", cres);
+        Delete(cres);
       }
     }
 
@@ -1381,7 +1428,9 @@ public:
         Printf(w->code, "%s;\n", super_call);
         Delete(super_call);
       } else {
-        Printf(w->code, "Swig::DirectorPureVirtualException::raise(\"Attempted to invoke pure virtual method %s::%s\");\n", SwigType_namestr(c_classname),
+        Printf(w->code,
+               "Swig::DirectorPureVirtualException::raise(\"Attempted to invoke pure virtual method %s::%s\");\n",
+               SwigType_namestr(c_classname),
                SwigType_namestr(name));
       }
     } else {
@@ -1435,9 +1484,13 @@ public:
           p = Getattr(p, "tmap:directorin:next");
           continue;
         } else if (Cmp(ptype, "void")) {
-          Swig_warning(WARN_TYPEMAP_DIRECTORIN_UNDEF, input_file, line_number,
-                       "Unable to use type %s as a function argument in director method %s::%s (skipping method).\n", SwigType_str(ptype, 0),
-                       SwigType_namestr(c_classname), SwigType_namestr(name));
+          Swig_warning(WARN_TYPEMAP_DIRECTORIN_UNDEF,
+                       input_file,
+                       line_number,
+                       "Unable to use type %s as a function argument in director method %s::%s (skipping method).\n",
+                       SwigType_str(ptype, 0),
+                       SwigType_namestr(c_classname),
+                       SwigType_namestr(name));
           status = SWIG_NOWRAP;
           break;
         }
@@ -1463,14 +1516,18 @@ public:
       // marshal return value
       if (!is_void) {
         Printf(w->code, "if (out.length()<%d) {\n", outputs);
-        Printf(w->code, "Swig::DirectorTypeMismatchException::raise(\"Octave "
-               "method %s.%s failed to return the required number " "of arguments.\");\n", classname, method_name);
+        Printf(w->code,
+               "Swig::DirectorTypeMismatchException::raise(\"Octave "
+               "method %s.%s failed to return the required number "
+               "of arguments.\");\n",
+               classname,
+               method_name);
         Printf(w->code, "}\n");
 
         tm = Swig_typemap_lookup("directorout", n, Swig_cresult_name(), w);
         if (tm != 0) {
           char temp[24];
-          sprintf(temp, "out(%d)", idx);
+          snprintf(temp, sizeof(temp), "out(%d)", idx);
           Replaceall(tm, "$input", temp);
           //    Replaceall(tm, "$argnum", temp);
           Replaceall(tm, "$disown", Getattr(n, "wrap:disown") ? "SWIG_POINTER_DISOWN" : "0");
@@ -1481,9 +1538,13 @@ public:
           Printv(w->code, tm, "\n", NIL);
           Delete(tm);
         } else {
-          Swig_warning(WARN_TYPEMAP_DIRECTOROUT_UNDEF, input_file, line_number,
+          Swig_warning(WARN_TYPEMAP_DIRECTOROUT_UNDEF,
+                       input_file,
+                       line_number,
                        "Unable to use return type %s in director method %s::%s (skipping method).\n",
-                       SwigType_str(returntype, 0), SwigType_namestr(c_classname), SwigType_namestr(name));
+                       SwigType_str(returntype, 0),
+                       SwigType_namestr(c_classname),
+                       SwigType_namestr(name));
           status = SWIG_ERROR;
         }
       }
@@ -1493,7 +1554,7 @@ public:
       for (p = l; p;) {
         if ((tm = Getattr(p, "tmap:directorargout")) != 0) {
           char temp[24];
-          sprintf(temp, "out(%d)", idx);
+          snprintf(temp, sizeof(temp), "out(%d)", idx);
           Replaceall(tm, "$result", temp);
           Replaceall(tm, "$input", Getattr(p, "emit:directorinput"));
           Printv(w->code, tm, "\n", NIL);
@@ -1538,6 +1599,7 @@ public:
     }
     // emit the director method
     if (status == SWIG_OK) {
+      emit_isvoid_special_variables(0, w->code, is_void);
       if (!Getattr(n, "defaultargs")) {
         Replaceall(w->code, "$symname", symname);
         Wrapper_print(w, f_directors);

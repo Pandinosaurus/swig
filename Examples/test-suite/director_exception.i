@@ -48,7 +48,7 @@ namespace Swig {
 %feature("director:except") {
   jthrowable $error = jenv->ExceptionOccurred();
   if ($error) {
-    // Dont clear exception, still be active when return to java execution
+    // Don't clear exception, still be active when return to java execution
     // Essentially ignore exception occurred -- old behavior.
     return $null;
   }
@@ -65,6 +65,18 @@ namespace Swig {
 %exception {
   try { $action }
   catch (Swig::DirectorException &e) { rb_exc_raise(e.getError()); }
+}
+
+#endif
+
+#ifdef SWIGLUA
+
+%exception {
+  try { $action }
+  catch (Swig::DirectorException &e) { 
+    lua_pushstring(L, e.what());
+    SWIG_fail;
+  }
 }
 
 #endif

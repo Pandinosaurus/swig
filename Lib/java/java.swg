@@ -5,6 +5,7 @@
  * ----------------------------------------------------------------------------- */
 
 %include <javahead.swg>
+%include <swigcommon.swg>
 
 /* The jni, jtype and jstype typemaps work together and so there should be one of each. 
  * The jni typemap contains the JNI type used in the JNI (C/C++) code. 
@@ -665,7 +666,7 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
 
 %typemap(out) SWIGTYPE 
 #ifdef __cplusplus
-%{ *($&1_ltype*)&$result = new $1_ltype((const $1_ltype &)$1); %}
+%{ *($&1_ltype*)&$result = new $1_ltype($1); %}
 #else
 {
   $&1_ltype $1ptr = ($&1_ltype) malloc(sizeof($1_ltype));
@@ -676,37 +677,43 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
 
 %typemap(directorin,descriptor="L$packagepath/$&javaclassname;") SWIGTYPE 
 %{ $input = 0;
-   *(($&1_ltype*)&$input) = new $1_ltype((const $1_ltype &)$1); %}
+   *(($&1_ltype*)&$input) = new $1_ltype(SWIG_STD_MOVE($1)); %}
 %typemap(javadirectorin) SWIGTYPE "new $&javaclassname($jniinput, true)"
 %typemap(javadirectorout) SWIGTYPE "$&javaclassname.getCPtr($javacall)"
 
 /* Generic pointers and references */
 %typemap(in) SWIGTYPE * %{ $1 = *($&1_ltype)&$input; %}
-%typemap(in, fragment="SWIG_UnPackData") SWIGTYPE (CLASS::*) { 
-  const char *temp = 0;
+%typemap(in, fragment="SWIG_UnPackData") SWIGTYPE (CLASS::*) {
+  $1 = 0;
   if ($input) {
-    temp = JCALL2(GetStringUTFChars, jenv, $input, 0);
-    if (!temp) return $null;
+    const char *temp = JCALL2(GetStringUTFChars, jenv, $input, 0);
+    if (!temp) {
+      return $null;
+    }
+    SWIG_UnpackData(temp, (void *)&$1, sizeof($1));
+    JCALL2(ReleaseStringUTFChars, jenv, $input, temp);
   }
-  SWIG_UnpackData(temp, (void *)&$1, sizeof($1));
 }
 %typemap(in) SWIGTYPE & %{ $1 = *($&1_ltype)&$input;
   if (!$1) {
-    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "$1_type reference is null");
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "$1_type is null");
     return $null;
   } %}
-%typemap(in) SWIGTYPE && %{ $1 = *($&1_ltype)&$input;
+%typemap(in, fragment="<memory>") SWIGTYPE && (std::unique_ptr<$*1_ltype> rvrdeleter) %{ $1 = *($&1_ltype)&$input;
   if (!$1) {
-    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "$1_type reference is null");
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "$1_type is null");
     return $null;
-  } %}
+  }
+  rvrdeleter.reset($1); %}
 %typemap(out) SWIGTYPE *
 %{ *($&1_ltype)&$result = $1; %} 
 %typemap(out, fragment="SWIG_PackData", noblock=1) SWIGTYPE (CLASS::*) {
-  char buf[128];
-  char *data = SWIG_PackData(buf, (void *)&$1, sizeof($1));
-  *data = '\0';
-  $result = JCALL1(NewStringUTF, jenv, buf);
+  if ($1) {
+    char buf[128];
+    char *data = SWIG_PackData(buf, (void *)&$1, sizeof($1));
+    *data = '\0';
+    $result = JCALL1(NewStringUTF, jenv, buf);
+  }
 }
 %typemap(out) SWIGTYPE &
 %{ *($&1_ltype)&$result = $1; %} 
@@ -715,13 +722,40 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
 
 %typemap(directorout, warning=SWIGWARN_TYPEMAP_DIRECTOROUT_PTR_MSG) SWIGTYPE *
 %{ $result = *($&1_ltype)&$input; %}
-%typemap(directorout, warning=SWIGWARN_TYPEMAP_DIRECTOROUT_PTR_MSG) SWIGTYPE (CLASS::*)
-%{ $result = *($&1_ltype)&$input; %}
+%typemap(directorout, noblock=1, warning=SWIGWARN_TYPEMAP_DIRECTOROUT_PTR_MSG, fragment="SWIG_UnPackData") SWIGTYPE (CLASS::*) {
+  if ($input) {
+    const char *temp = JCALL2(GetStringUTFChars, jenv, $input, 0);
+    if (!temp) return $null;
+    SWIG_UnpackData(temp, (void *)&$result, sizeof($result));
+    JCALL2(ReleaseStringUTFChars, jenv, $input, temp);
+  }
+}
+/* A function pointer does not point to an object that can be deleted, so there is no warning as for SWIGTYPE * */
+/* A function pointer is copied using memcpy, as a cast to a pointer to a pointer to a noexcept function is not valid before C++17 */
+%typemap(directorout) SWIGTYPE ((*)(ANY)), SWIGTYPE ((* const)(ANY))
+%{ memcpy(&$result, &$input, sizeof($result)); %}
+%typemap(in) SWIGTYPE ((*)(ANY))
+%{ memcpy(&$1, &$input, sizeof($1)); %}
+%typemap(out) SWIGTYPE ((*)(ANY))
+%{ memcpy(&$result, &$1, sizeof($1)); %}
+%typemap(directorin,descriptor="L$packagepath/$javaclassname;") SWIGTYPE ((*)(ANY))
+%{ memcpy(&$input, &$1, sizeof($1)); %}
 
 %typemap(directorin,descriptor="L$packagepath/$javaclassname;") SWIGTYPE *
 %{ *(($&1_ltype)&$input) = ($1_ltype) $1; %}
-%typemap(directorin,descriptor="L$packagepath/$javaclassname;") SWIGTYPE (CLASS::*)
-%{ *(($&1_ltype)&$input) = ($1_ltype) $1; %}
+%typemap(directorin,descriptor="L$packagepath/$javaclassname;", noblock=1, fragment="SWIG_PackData") SWIGTYPE (CLASS::*) {
+  $input = 0;
+  if ($1) {
+    char buf[128];
+    char *data = SWIG_PackData(buf, (void *)&$1, sizeof($1));
+    *data = '\0';
+    $input = JCALL1(NewStringUTF, jenv, buf);
+    if (!$input) {
+      return $null;
+    }
+  }
+  Swig::LocalRefGuard $1_refguard(jenv, $input);
+}
 
 %typemap(directorout, warning=SWIGWARN_TYPEMAP_DIRECTOROUT_PTR_MSG) SWIGTYPE &
 %{ if (!$input) {
@@ -740,18 +774,54 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
 %typemap(directorin,descriptor="L$packagepath/$javaclassname;") SWIGTYPE &&
 %{ *($&1_ltype)&$input = ($1_ltype) &$1; %}
 
-%typemap(javadirectorin) SWIGTYPE *, SWIGTYPE (CLASS::*) "($jniinput == 0) ? null : new $javaclassname($jniinput, false)"
+%typemap(javadirectorin) SWIGTYPE * "($jniinput == 0) ? null : new $javaclassname($jniinput, false)"
+%typemap(javadirectorin) SWIGTYPE (CLASS::*) "($jniinput == null) ? null : new $javaclassname($jniinput, false)"
 %typemap(javadirectorin) SWIGTYPE & "new $javaclassname($jniinput, false)"
 %typemap(javadirectorin) SWIGTYPE && "new $javaclassname($jniinput, false)"
-%typemap(javadirectorout) SWIGTYPE *, SWIGTYPE (CLASS::*), SWIGTYPE &, SWIGTYPE && "$javaclassname.getCPtr($javacall)"
+%typemap(javadirectorout) SWIGTYPE *, SWIGTYPE &, SWIGTYPE && "$javaclassname.getCPtr($javacall)"
+%typemap(javadirectorout) SWIGTYPE (CLASS::*) "$javaclassname.getCMemberPtr($javacall)"
 
 /* Default array handling */
 %typemap(in) SWIGTYPE [] %{ $1 = *($&1_ltype)&$input; %}
 %typemap(out) SWIGTYPE [] %{ *($&1_ltype)&$result = $1; %} 
 %typemap(freearg) SWIGTYPE [ANY], SWIGTYPE [] ""
 
-/* char arrays - treat as String */
-%typemap(in, noblock=1) char[ANY], char[] {
+/* char arrays - treat as String, copying into a zero filled array when the size is known */
+%typemap(in, noblock=1, fragment="SWIG_CopyCharArray") char[ANY] (char temp[$1_dim0]) {
+  $1 = 0;
+  if ($input) {
+    const char *$1_pstr = JCALL2(GetStringUTFChars, jenv, $input, 0);
+    int $1_copied;
+    if (!$1_pstr)
+      return $null;
+    $1_copied = SWIG_CopyCharArray(temp, $1_dim0, $1_pstr, strlen($1_pstr));
+    JCALL2(ReleaseStringUTFChars, jenv, $input, $1_pstr);
+    if (!$1_copied) {
+      SWIG_JavaThrowException(jenv, SWIG_JavaIllegalArgumentException, "string too long for char array");
+      return $null;
+    }
+    $1 = ($1_ltype)temp;
+  }
+}
+
+/* A C99 variable length array parameter, as in 'int n, char s[n]' */
+%typemap(in, noblock=1, fragment="SWIG_NewCharArray") char[*] {
+  $1 = 0;
+  if ($input) {
+    const char *$1_pstr = JCALL2(GetStringUTFChars, jenv, $input, 0);
+    if (!$1_pstr)
+      return $null;
+    $1 = ($1_ltype)(($1_dim0) > 0 ? SWIG_NewCharArray((size_t)($1_dim0), $1_pstr, strlen($1_pstr)) : 0);
+    JCALL2(ReleaseStringUTFChars, jenv, $input, $1_pstr);
+    if (!$1) {
+      SWIG_JavaThrowException(jenv, SWIG_JavaIllegalArgumentException, "string too long for char array");
+      return $null;
+    }
+  }
+}
+%typemap(freearg) char[*] %{ free((char *)$1); %}
+
+%typemap(in, noblock=1) char[] {
   $1 = 0;
   if ($input) {
     $1 = ($1_ltype)JCALL2(GetStringUTFChars, jenv, $input, 0);
@@ -767,7 +837,21 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
   }
 }
 
-%typemap(directorin, descriptor="Ljava/lang/String;", noblock=1) char[ANY], char[] {
+/* No NULL check of $1 itself, as it is never NULL for the char (&)[ANY] typemap applied from this one */
+%typemap(directorin, descriptor="Ljava/lang/String;", noblock=1, fragment="SWIG_CharArrayString") char[ANY] {
+  $input = 0;
+  {
+    const char *swig_str = SWIG_CharArrayString((const char *)$1, $1_dim0);
+    if (swig_str) {
+      $input = JCALL1(NewStringUTF, jenv, swig_str);
+      SWIG_DeleteCharArrayString(swig_str, (const char *)$1);
+      if (!$input)
+        return $null;
+    }
+  }
+  Swig::LocalRefGuard $1_refguard(jenv, $input);
+}
+%typemap(directorin, descriptor="Ljava/lang/String;", noblock=1) char[] {
   $input = 0;
   if ($1) {
     $input = JCALL1(NewStringUTF, jenv, (const char *)$1);
@@ -777,8 +861,17 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
 }
 
 %typemap(argout) char[ANY], char[] ""
-%typemap(freearg, noblock=1) char[ANY], char[] { if ($1) JCALL2(ReleaseStringUTFChars, jenv, $input, (const char *)$1); }
-%typemap(out, noblock=1) char[ANY], char[] { if ($1) $result = JCALL1(NewStringUTF, jenv, (const char *)$1); }
+%typemap(freearg) char[ANY] ""
+%typemap(freearg, noblock=1) char[] { if ($1) JCALL2(ReleaseStringUTFChars, jenv, $input, (const char *)$1); }
+%typemap(out, noblock=1, fragment="SWIG_CharArrayString") char[ANY] {
+  if ($1) {
+    const char *swig_str = SWIG_CharArrayString((const char *)$1, $1_dim0);
+    if (swig_str)
+      $result = JCALL1(NewStringUTF, jenv, swig_str);
+    SWIG_DeleteCharArrayString(swig_str, (const char *)$1);
+  }
+}
+%typemap(out, noblock=1) char[] { if ($1) $result = JCALL1(NewStringUTF, jenv, (const char *)$1); }
 %typemap(javadirectorin) char[ANY], char[] "$jniinput"
 %typemap(javadirectorout) char[ANY], char[] "$javacall"
 
@@ -1025,7 +1118,8 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
     SWIGTYPE &&, 
     SWIGTYPE *const&, 
     SWIGTYPE [],
-    SWIGTYPE (CLASS::*)
+    SWIGTYPE (CLASS::*),
+    SWIGTYPE (CLASS::*const&)
     ""
 
 
@@ -1038,7 +1132,7 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
                  unsigned long, 
                  unsigned short
 %{ char error_msg[256];
-   sprintf(error_msg, "C++ $1_type exception thrown, value: %d", $1);
+   SWIG_snprintf(error_msg, sizeof(error_msg), "C++ $1_type exception thrown, value: %d", $1);
    SWIG_JavaThrowException(jenv, SWIG_JavaRuntimeException, error_msg);
    return $null; %}
 
@@ -1101,7 +1195,8 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
                  jobjectArray
     "$javainput"
 %typemap(javain) SWIGTYPE "$&javaclassname.getCPtr($javainput)"
-%typemap(javain) SWIGTYPE *, SWIGTYPE &, SWIGTYPE &&, SWIGTYPE [] "$javaclassname.getCPtr($javainput)"
+%typemap(javain) SWIGTYPE *, SWIGTYPE &, SWIGTYPE [] "$javaclassname.getCPtr($javainput)"
+%typemap(javain) SWIGTYPE && "$javaclassname.swigRelease($javainput)"
 %typemap(javain) SWIGTYPE (CLASS::*) "$javaclassname.getCMemberPtr($javainput)"
 
 /* The javaout typemap is used for converting function return types from the return type
@@ -1190,6 +1285,63 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
 %typemap(javadirectorin) SWIGTYPE *const& "($jniinput == 0) ? null : new $*javaclassname($jniinput, false)"
 %typemap(javadirectorout) SWIGTYPE *const& "$*javaclassname.getCPtr($javacall)"
 
+/* Member pointer reference typemaps */
+%typemap(jni) SWIGTYPE (CLASS::*const&) "jstring"
+%typemap(jtype) SWIGTYPE (CLASS::*const&) "String"
+%typemap(jstype) SWIGTYPE (CLASS::*const&) "$*javaclassname"
+%typemap(javain) SWIGTYPE (CLASS::*const&) "$*javaclassname.getCMemberPtr($javainput)"
+%typemap(javaout) SWIGTYPE (CLASS::*const&) {
+    String cMemberPtr = $jnicall;
+    return (cMemberPtr == null) ? null : new $*javaclassname(cMemberPtr, $owner);
+  }
+%typemap(in, noblock=1, fragment="SWIG_UnPackData") (SWIGTYPE (CLASS::*const&)) ($*1_ltype temp = 0) {
+  if ($input) {
+    const char *$1_pstr = JCALL2(GetStringUTFChars, jenv, $input, 0);
+    if (!$1_pstr) {
+      return $null;
+    }
+    SWIG_UnpackData($1_pstr, (void *)&temp, sizeof(temp));
+    JCALL2(ReleaseStringUTFChars, jenv, $input, $1_pstr);
+  }
+  $1 = &temp;
+}
+%typemap(out, noblock=1, fragment="SWIG_PackData") SWIGTYPE (CLASS::*const&) {
+  if (*$1) {
+    char buf[128];
+    char *data = SWIG_PackData(buf, (void *)$1, sizeof(*$1));
+    *data = '\0';
+    $result = JCALL1(NewStringUTF, jenv, buf);
+  }
+}
+%typemap(directorin, descriptor="L$packagepath/$*javaclassname;", noblock=1, fragment="SWIG_PackData") SWIGTYPE (CLASS::*const&) {
+  $input = 0;
+  if ($1) {
+    char buf[128];
+    char *data = SWIG_PackData(buf, (void *)&$1, sizeof($1));
+    *data = '\0';
+    $input = JCALL1(NewStringUTF, jenv, buf);
+    if (!$input) {
+      return $null;
+    }
+  }
+  Swig::LocalRefGuard $1_refguard(jenv, $input);
+}
+%typemap(directorout, noblock=1, warning=SWIGWARN_TYPEMAP_THREAD_UNSAFE_MSG, fragment="SWIG_UnPackData") SWIGTYPE (CLASS::*const&) {
+  static SwigTypeIdentity< $*1_ltype >::type swig_temp;
+  swig_temp = 0;
+  if ($input) {
+    const char *temp = JCALL2(GetStringUTFChars, jenv, $input, 0);
+    if (!temp) {
+      return $null;
+    }
+    SWIG_UnpackData(temp, (void *)&swig_temp, sizeof(swig_temp));
+    JCALL2(ReleaseStringUTFChars, jenv, $input, temp);
+  }
+  $result = &swig_temp;
+}
+%typemap(javadirectorin) SWIGTYPE (CLASS::*const&) "($jniinput == null) ? null : new $*javaclassname($jniinput, false)"
+%typemap(javadirectorout) SWIGTYPE (CLASS::*const&) "$*javaclassname.getCMemberPtr($javacall)"
+
 /* Typemaps used for the generation of proxy and type wrapper class code */
 %typemap(javabase)             SWIGTYPE, SWIGTYPE *, SWIGTYPE &, SWIGTYPE &&, SWIGTYPE [], SWIGTYPE (CLASS::*) ""
 %typemap(javaclassmodifiers)   SWIGTYPE, SWIGTYPE *, SWIGTYPE &, SWIGTYPE &&, SWIGTYPE [], SWIGTYPE (CLASS::*) "public class"
@@ -1216,6 +1368,18 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
   CPTR_VISIBILITY static long getCPtr($javaclassname obj) {
     return (obj == null) ? 0 : obj.swigCPtr;
   }
+
+  CPTR_VISIBILITY static long swigRelease($javaclassname obj) {
+    long ptr = 0;
+    if (obj != null) {
+      if (!obj.swigCMemOwn)
+        throw new RuntimeException("Cannot release ownership as memory is not owned");
+      ptr = obj.swigCPtr;
+      obj.swigCMemOwn = false;
+      obj.delete();
+    }
+    return ptr;
+  }
 %}
 
 // Derived proxy classes
@@ -1229,6 +1393,18 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
 
   CPTR_VISIBILITY static long getCPtr($javaclassname obj) {
     return (obj == null) ? 0 : obj.swigCPtr;
+  }
+
+  CPTR_VISIBILITY static long swigRelease($javaclassname obj) {
+    long ptr = 0;
+    if (obj != null) {
+      if (!obj.swigCMemOwn)
+        throw new RuntimeException("Cannot release ownership as memory is not owned");
+      ptr = obj.swigCPtr;
+      obj.swigCMemOwn = false;
+      obj.delete();
+    }
+    return ptr;
   }
 %}
 %enddef
@@ -1249,6 +1425,10 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
   CPTR_VISIBILITY static long getCPtr($javaclassname obj) {
     return (obj == null) ? 0 : obj.swigCPtr;
   }
+
+  CPTR_VISIBILITY static long swigRelease($javaclassname obj) {
+    return (obj == null) ? 0 : obj.swigCPtr;
+  }
 %}
 
 %typemap(javabody) TYPE (CLASS::*) %{
@@ -1263,7 +1443,7 @@ Swig::LocalRefGuard $1_refguard(jenv, $input); }
   }
 
   CPTR_VISIBILITY static String getCMemberPtr($javaclassname obj) {
-    return obj.swigCMemberPtr;
+    return (obj == null) ? null : obj.swigCMemberPtr;
   }
 %}
 %enddef
@@ -1274,7 +1454,7 @@ SWIG_JAVABODY_PROXY(protected, protected, SWIGTYPE)
 SWIG_JAVABODY_TYPEWRAPPER(protected, protected, protected, SWIGTYPE)
 
 %typemap(javafinalize) SWIGTYPE %{
-  @SuppressWarnings("deprecation")
+  @SuppressWarnings({"deprecation", "removal"})
   protected void finalize() {
     delete();
   }
@@ -1368,26 +1548,53 @@ SWIG_PROXY_CONSTRUCTOR(true, true, SWIGTYPE)
 
 %pragma(java) jniclassclassmodifiers="public class"
 %pragma(java) moduleclassmodifiers="public class"
+%pragma(java) constantsmodifiers="public interface"
 
-/* Some ANSI C typemaps */
+/* 64-bit architecture specific typemaps */
+#if defined(SWIGWORDSIZE64)
+%apply long long { long };
+%apply unsigned long long { unsigned long };
+%apply const long long & { const long & };
+%apply const unsigned long long & { const unsigned long & };
+#endif
 
-%apply unsigned long { size_t };
-%apply const unsigned long & { const size_t & };
+/* size_t maps to Java 64-bit (signed) long type */
+%apply unsigned int { size_t };
+%apply const unsigned int & { const size_t & };
 
 /* Array reference typemaps */
 %apply SWIGTYPE & { SWIGTYPE ((&)[ANY]) }
-%apply SWIGTYPE && { SWIGTYPE ((&&)[ANY]) }
+%apply char[ANY] { char (&)[ANY], char (&&)[ANY] }
+/* Unlike for a char array, NULL is not accepted, as a reference cannot be bound to NULL */
+%typemap(in, noblock=1, fragment="SWIG_CopyCharArray") char (&)[ANY] (char temp[$1_dim0]), char (&&)[ANY] (char temp[$1_dim0]) {
+  if (!$input) {
+    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "$1_type is null");
+    return $null;
+  } else {
+    const char *$1_pstr = JCALL2(GetStringUTFChars, jenv, $input, 0);
+    int $1_copied;
+    if (!$1_pstr)
+      return $null;
+    $1_copied = SWIG_CopyCharArray(temp, $1_dim0, $1_pstr, strlen($1_pstr));
+    JCALL2(ReleaseStringUTFChars, jenv, $input, $1_pstr);
+    if (!$1_copied) {
+      SWIG_JavaThrowException(jenv, SWIG_JavaIllegalArgumentException, "string too long for char array");
+      return $null;
+    }
+    $1 = ($1_ltype)temp;
+  }
+}
+%apply SWIGTYPE & { SWIGTYPE ((&&)[ANY]), SWIGTYPE ((&&)[]), SWIGTYPE ((&&)(ANY)) }
 
-/* const pointers */
-%apply SWIGTYPE * { SWIGTYPE *const }
+/* const and volatile pointers */
+%apply SWIGTYPE * { SWIGTYPE *const, SWIGTYPE *volatile, SWIGTYPE *const volatile }
 %apply SWIGTYPE (CLASS::*) { SWIGTYPE (CLASS::*const) }
-%apply SWIGTYPE & { SWIGTYPE (CLASS::*const&) }
 
 /* String & length */
 %typemap(jni)     (const char *STRING, size_t LENGTH) "jbyteArray"
 %typemap(jtype)   (const char *STRING, size_t LENGTH) "byte[]"
-%typemap(jstype)  (const char *STRING, size_t LENGTH) "byte[]"
-%typemap(javain)  (const char *STRING, size_t LENGTH) "$javainput"
+%typemap(jstype)  (const char *STRING, size_t LENGTH) "String"
+%typemap(javain)  (const char *STRING, size_t LENGTH) %{($javainput == null) ? null : $javainput.getBytes()%}
 %typemap(freearg) (const char *STRING, size_t LENGTH) ""
 %typemap(in)      (const char *STRING, size_t LENGTH) {
   if ($input) {
@@ -1401,7 +1608,8 @@ SWIG_PROXY_CONSTRUCTOR(true, true, SWIGTYPE)
 %typemap(argout)  (const char *STRING, size_t LENGTH) {
   if ($input) JCALL3(ReleaseByteArrayElements, jenv, $input, (jbyte *)$1, JNI_ABORT);
 }
-%typemap(directorin, descriptor="[B", noblock=1) (const char *STRING, size_t LENGTH) {
+%typecheck(SWIG_TYPECHECK_STRING) (const char *STRING, size_t LENGTH) ""
+%typemap(directorin, descriptor="Ljava/lang/String;", noblock=1) (const char *STRING, size_t LENGTH) {
   $input = 0;
   if ($1) {
     $input = JCALL1(NewByteArray, jenv, (jsize)$2);
@@ -1410,7 +1618,7 @@ SWIG_PROXY_CONSTRUCTOR(true, true, SWIGTYPE)
   }
   Swig::LocalRefGuard $1_refguard(jenv, $input);
 }
-%typemap(javadirectorin, descriptor="[B") (const char *STRING, size_t LENGTH) "$jniinput"
+%typemap(javadirectorin, descriptor="[B") (const char *STRING, size_t LENGTH) "($jniinput == null) ? null : new String($jniinput)"
 %apply (const char *STRING, size_t LENGTH) { (char *STRING, size_t LENGTH) }
 /* Enable write-back for non-const version */
 %typemap(argout)  (char *STRING, size_t LENGTH) {
@@ -1418,7 +1626,48 @@ SWIG_PROXY_CONSTRUCTOR(true, true, SWIGTYPE)
 }
 %typemap(directorargout, noblock=1) (char *STRING, size_t LENGTH)
 { if ($input && $1) JCALL4(GetByteArrayRegion, jenv, $input, 0, (jsize)$2, (jbyte *)$1); }
+
 %apply (char *STRING, size_t LENGTH) { (char *STRING, int LENGTH) }
+
+/* Length & string reverse order typemap */
+
+%typemap(jni)     (size_t LENGTH, const char *STRING) "jbyteArray"
+%typemap(jtype)   (size_t LENGTH, const char *STRING) "byte[]"
+%typemap(jstype)  (size_t LENGTH, const char *STRING) "String"
+%typemap(javain)  (size_t LENGTH, const char *STRING) %{($javainput == null) ? null : $javainput.getBytes()%}
+%typemap(freearg) (size_t LENGTH, const char *STRING) ""
+%typemap(in)      (size_t LENGTH, const char *STRING) {
+  if ($input) {
+    $2 = ($2_ltype) JCALL2(GetByteArrayElements, jenv, $input, 0);
+    $1 = ($1_type) JCALL1(GetArrayLength, jenv, $input);
+  } else {
+    $1 = 0;
+    $2 = 0;
+  }
+}
+%typemap(argout)  (size_t LENGTH, const char *STRING) {
+  if ($input) JCALL3(ReleaseByteArrayElements, jenv, $input, (jbyte *)$2, JNI_ABORT);
+}
+%typecheck(SWIG_TYPECHECK_STRING) (size_t LENGTH, const char *STRING) ""
+%typemap(directorin, descriptor="Ljava/lang/String;", noblock=1) (size_t LENGTH, const char *STRING) {
+  $input = 0;
+  if ($2) {
+    $input = JCALL1(NewByteArray, jenv, (jsize)$1);
+    if (!$input) return $null;
+    JCALL4(SetByteArrayRegion, jenv, $input, 0, (jsize)$1, (jbyte *)$2);
+  }
+  Swig::LocalRefGuard $2_refguard(jenv, $input);
+}
+%typemap(javadirectorin, descriptor="[B") (size_t LENGTH, const char *STRING) "($jniinput == null) ? null : new String($jniinput)"
+%apply (size_t LENGTH, const char *STRING) { (size_t LENGTH, char *STRING) }
+/* Enable write-back for non-const version */
+%typemap(argout)  (size_t LENGTH, char *STRING) {
+  if ($input) JCALL3(ReleaseByteArrayElements, jenv, $input, (jbyte *)$2, 0);
+}
+%typemap(directorargout, noblock=1) (size_t LENGTH, char *STRING)
+{ if ($input && $2) JCALL4(GetByteArrayRegion, jenv, $input, 0, (jsize)$1, (jbyte *)$2); }
+
+%apply (size_t LENGTH, char *STRING) { (int LENGTH, char *STRING) }
 
 /* java keywords */
 %include <javakw.swg>

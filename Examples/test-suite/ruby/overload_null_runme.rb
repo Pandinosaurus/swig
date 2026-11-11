@@ -40,13 +40,25 @@ swig_assert(14 == o.byval1cpr(nil))
 swig_assert(15 == o.byval2cpr(nil))
 swig_assert(16 == o.byval2cpr(x))
 
-# forward class declaration
-swig_assert(17 == o.byval1forwardptr(x))
-swig_assert(18 == o.byval1forwardptr(nil))
+# fwd class declaration
+swig_assert(17 == o.byval1fwdptr(x))
+swig_assert(18 == o.byval1fwdptr(nil))
 
-swig_assert(19 == o.byval2forwardptr(nil))
-swig_assert(20 == o.byval2forwardptr(x))
+swig_assert(19 == o.byval2fwdptr(nil))
+swig_assert(20 == o.byval2fwdptr(x))
 
-swig_assert(21 == o.byval1forwardref(x))
+swig_assert(21 == o.byval1fwdref(x))
 
-swig_assert(22 == o.byval2forwardref(x))
+swig_assert(22 == o.byval2fwdref(x))
+
+swig_assert(23 == o.bychar1("a"))
+swig_assert(24 == o.bychar1(nil))
+
+# NULL is a NULL pointer for an array of char too
+swig_assert(37 == o.bychararray(x))
+swig_assert(-38 == o.bychararray(nil))
+swig_assert(38 == o.bychararray("ab"))
+
+swig_assert(39 == o.byunsizedchararray(x))
+swig_assert(-40 == o.byunsizedchararray(nil))
+swig_assert(40 == o.byunsizedchararray("ab"))

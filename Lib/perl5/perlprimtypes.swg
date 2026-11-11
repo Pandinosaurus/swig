@@ -46,6 +46,7 @@ SWIG_From_dec(long)(long value)
 }
 
 %fragment(SWIG_AsVal_frag(long),"header",
+	  fragment="<errno.h>",
 	  fragment="<limits.h>",
 	  fragment="<stdlib.h>",
 	  fragment="SWIG_CanCastAsInteger") {
@@ -78,7 +79,7 @@ SWIG_AsVal_dec(long)(SV *obj, long* val)
 	errno = 0;
 	return SWIG_OverflowError;
       } else {
-	if (*endptr == '\0') {
+	if (endptr != nptr && *endptr == '\0') {
 	  if (val) *val = v;
 	  return SWIG_Str2NumCast(SWIG_OK);
 	}
@@ -87,7 +88,12 @@ SWIG_AsVal_dec(long)(SV *obj, long* val)
     if (!dispatch) {
       double d;
       int res = SWIG_AddCast(SWIG_AsVal(double)(obj,&d));
-      if (SWIG_IsOK(res) && SWIG_CanCastAsInteger(&d, LONG_MIN, LONG_MAX)) {
+      // Largest double not larger than LONG_MAX (not portably calculated easily)
+      // Note that double(LONG_MAX) is stored in a double rounded up by one (for 64-bit long)
+      // 0x7ffffffffffffc00LL == (int64_t)std::nextafter(double(__uint128_t(LONG_MAX)+1), double(0))
+      const double long_max = sizeof(long) == 8 ? 0x7ffffffffffffc00LL : LONG_MAX;
+      // No equivalent needed for 64-bit double(LONG_MIN) is exactly LONG_MIN
+      if (SWIG_IsOK(res) && SWIG_CanCastAsInteger(&d, LONG_MIN, long_max)) {
 	if (val) *val = (long)(d);
 	return res;
       }
@@ -113,8 +119,10 @@ SWIG_From_dec(unsigned long)(unsigned long value)
 }
 
 %fragment(SWIG_AsVal_frag(unsigned long),"header",
+	  fragment="<errno.h>",
 	  fragment="<limits.h>",
 	  fragment="<stdlib.h>",
+	  fragment="<string.h>",
 	  fragment="SWIG_CanCastAsInteger") {
 SWIGINTERN int
 SWIG_AsVal_dec(unsigned long)(SV *obj, unsigned long *val) 
@@ -145,7 +153,9 @@ SWIG_AsVal_dec(unsigned long)(SV *obj, unsigned long *val)
 	errno = 0;
 	return SWIG_OverflowError;
       } else {
-	if (*endptr == '\0') {
+	if (endptr != nptr && *endptr == '\0') {
+	  if (v != 0 && strchr(nptr, '-'))
+	    return SWIG_OverflowError;
 	  if (val) *val = v;
 	  return SWIG_Str2NumCast(SWIG_OK);
 	}
@@ -154,7 +164,11 @@ SWIG_AsVal_dec(unsigned long)(SV *obj, unsigned long *val)
     if (!dispatch) {
       double d;
       int res = SWIG_AddCast(SWIG_AsVal(double)(obj,&d));
-      if (SWIG_IsOK(res) && SWIG_CanCastAsInteger(&d, 0, ULONG_MAX)) {
+      // Largest double not larger than ULONG_MAX (not portably calculated easily)
+      // Note that double(ULONG_MAX) is stored in a double rounded up by one (for 64-bit unsigned long)
+      // 0xfffffffffffff800ULL == (uint64_t)std::nextafter(double(__uint128_t(ULONG_MAX)+1), double(0))
+      const double ulong_max = sizeof(unsigned long) == 8 ? 0xfffffffffffff800ULL : ULONG_MAX;
+      if (SWIG_IsOK(res) && SWIG_CanCastAsInteger(&d, 0, ulong_max)) {
 	if (val) *val = (unsigned long)(d);
 	return res;
       }
@@ -179,7 +193,7 @@ SWIG_From_dec(long long)(long long value)
   else {
     //sv = newSVpvf("%lld", value); doesn't work in non 64bit Perl
     char temp[256];
-    sprintf(temp, "%lld", value);
+    SWIG_snprintf(temp, sizeof(temp), "%lld", value);
     sv = newSVpv(temp, 0);
   }
   return sv_2mortal(sv);
@@ -189,6 +203,7 @@ SWIG_From_dec(long long)(long long value)
 
 %fragment(SWIG_AsVal_frag(long long),"header",
 	  fragment="SWIG_LongLongAvailable",
+	  fragment="<errno.h>",
 	  fragment="<stdlib.h>",
 	  fragment="SWIG_CanCastAsInteger") {
 %#ifdef SWIG_LONG_LONG_AVAILABLE
@@ -222,7 +237,7 @@ SWIG_AsVal_dec(long long)(SV *obj, long long *val)
 	errno = 0;
 	return SWIG_OverflowError;
       } else {
-	if (*endptr == '\0') {
+	if (endptr != nptr && *endptr == '\0') {
 	  if (val) *val = v;
 	  return SWIG_Str2NumCast(SWIG_OK);
 	}
@@ -259,7 +274,7 @@ SWIG_From_dec(unsigned long long)(unsigned long long value)
   else {
     //sv = newSVpvf("%llu", value); doesn't work in non 64bit Perl
     char temp[256];
-    sprintf(temp, "%llu", value);
+    SWIG_snprintf(temp, sizeof(temp), "%llu", value);
     sv = newSVpv(temp, 0);
   }
   return sv_2mortal(sv);
@@ -269,7 +284,9 @@ SWIG_From_dec(unsigned long long)(unsigned long long value)
 
 %fragment(SWIG_AsVal_frag(unsigned long long),"header",
 	  fragment="SWIG_LongLongAvailable",
+	  fragment="<errno.h>",
 	  fragment="<stdlib.h>",
+	  fragment="<string.h>",
 	  fragment="SWIG_CanCastAsInteger") {
 %#ifdef SWIG_LONG_LONG_AVAILABLE
 SWIGINTERN int
@@ -280,7 +297,7 @@ SWIG_AsVal_dec(unsigned long long)(SV *obj, unsigned long long *val)
      * (UVSIZE <= sizeof(*val) || v <= ULLONG_MAX) */
     if (val) *val = SvUV(obj);
     return SWIG_OK;
-  } else  if (SvIOK(obj)) {
+  } else if (SvIOK(obj)) {
     IV v = SvIV(obj);
     if (v >= 0 && (IVSIZE <= sizeof(*val) || v <= ULLONG_MAX)) {
       if (val) *val = v;
@@ -300,7 +317,9 @@ SWIG_AsVal_dec(unsigned long long)(SV *obj, unsigned long long *val)
 	errno = 0;
 	return SWIG_OverflowError;
       } else {
-	if (*endptr == '\0') {
+	if (endptr != nptr && *endptr == '\0') {
+	  if (v != 0 && strchr(nptr, '-'))
+	    return SWIG_OverflowError;
 	  if (val) *val = v;
 	  return SWIG_Str2NumCast(SWIG_OK);
 	}
@@ -331,7 +350,8 @@ SWIG_From_dec(double)(double value)
 }
 }
 
-%fragment(SWIG_AsVal_frag(double),"header") {
+%fragment(SWIG_AsVal_frag(double),"header",
+	  fragment="<errno.h>") {
 SWIGINTERN int
 SWIG_AsVal_dec(double)(SV *obj, double *val)
 {
@@ -352,7 +372,7 @@ SWIG_AsVal_dec(double)(SV *obj, double *val)
 	errno = 0;
 	return SWIG_OverflowError;
       } else {
-	if (*endptr == '\0') {
+	if (endptr != nptr && *endptr == '\0') {
 	  if (val) *val = v;
 	  return SWIG_Str2NumCast(SWIG_OK);
 	}

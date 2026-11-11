@@ -19,4 +19,7 @@ void main() {
 
   auto newName = NewName.factory("factoryname");
   enforce(newName.getStoredName().getName() == "factoryname");
+  enforce(makeStringInt("stringint", 999) == "stringint");
+  enforce(provideStringInt(999) == "1000");
+  enforce(shortFunction(1, 1) == (200*2 + 200*3));
 }

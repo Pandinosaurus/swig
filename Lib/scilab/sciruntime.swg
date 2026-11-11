@@ -1,5 +1,4 @@
 %insert(runtime) "swigrun.swg";
-%insert(runtime) "swigerrors.swg";
 
 %insert(runtime) "scirun.swg";
 
@@ -40,7 +39,7 @@ SWIG_Scilab_TypeQuery(const char *name) {
 #ifdef __cplusplus
 extern "C"
 #endif
-int <module>_Init(SWIG_GatewayParameters) {
+SWIGEXPORT int SWIG_<module>_Init(SWIG_GatewayParameters) {
   SWIG_InitializeModule(NULL);
   SWIG_CreateScilabVariables(pvApiCtx);
   swig_module_initialized = 1;

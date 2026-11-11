@@ -49,12 +49,18 @@ class C(FooBar_int):
         return 2
 
     def get_name(self):
-        return FooBar_int.get_name(self) + " hello"
+        # We suppressed the warning:
+        #  Warning 473: Returning a reference, pointer or pointer wrapper in a director method is not recommended.
+        # An extra reference to the returned string is now required to keep it from being deleted as the C code
+        # uses a pointer to the internal Python string which would otherwise be deleted and then the pointer would
+        # point to garbage.
+        self.hack_extra_reference = FooBar_int.get_name(self) + " hello"
+        return self.hack_extra_reference
 
     pass
 
 cc = C()
-c = FooBar_int_get_self(cc)
+c = FooBar_int.get_self(cc)
 c.advance()
 
 if c.get_name() != "FooBar::get_name hello":

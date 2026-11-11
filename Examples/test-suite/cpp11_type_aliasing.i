@@ -63,12 +63,14 @@ using IntArray = Int[];
 
 // Test that SWIG understands these new types
 
+%{
+Int mult2(Int x) { return x * 2; }
+%}
 %callback("%s_cb");
 Int mult2(Int x);
 %nocallback;
 
 %inline %{
-Int mult2(Int x) { return x * 2; }
 IntPtr allocate_int() { return new Int(12); }
 void free_int(int* ptr) { delete ptr; }
 void inplace_mult2(IntRef x) { x *= 2; }
@@ -109,4 +111,60 @@ using callback_t = int(*)(int);
 
 callback_t get_callback() { return mult2; }
 int call(callback_t funk, int param) { return funk(param); }
+
+using callback_ref_t = int(&)(int);
+int call_ref(callback_ref_t funk, int param) { return funk(param); }
 %}
+
+// The same function pointer type written with the alternate function syntax
+
+%inline %{
+using alt_callback_t = auto (*)(int) -> int;
+using alt_function_t = auto (int) -> int;
+
+// Alias template - not used in a wrapped declaration as SWIG treats an alias template
+// instantiation as an opaque type, for the alternate function syntax and for any other type.
+template<typename T> using alt_fn_t = auto (*)(T) -> T;
+
+alt_callback_t get_alt_callback() { return mult2; }
+int call_alt(alt_callback_t funk, int param) { return funk(param); }
+int call_alt_fn(alt_function_t *funk, int param) { return funk(param); }
+%}
+
+
+// Template template parameters - from #1021
+%inline %{
+#include <type_traits>
+
+class Node {};
+struct AnyVal { typedef AnyVal Super; };
+
+template<template<typename D, typename O> class C, typename T, typename Super, typename Root, typename O>
+  using DeriveToBase = typename std::conditional<std::is_same<T, AnyVal>::value, Root, C<Super, O> >::type;
+
+template<class T, class Root, class RParent>
+  using ImmediateBase = typename std::conditional<std::is_same<T, AnyVal>::value, Root, RParent >::type;
+
+template<class D, typename _Super=AnyVal> class Expression {
+  typedef _Super Super;
+};
+
+void TestInstantiationsPart4() {
+  Expression<AnyVal, AnyVal::Super> express;
+  (void)express;
+  DeriveToBase<Expression, AnyVal, AnyVal, AnyVal, AnyVal> derive_to_base = AnyVal();
+  (void)derive_to_base;
+}
+%}
+
+#if 0
+// TODO define and instantiate std::conditional and std::is_same
+%template(ExpressionInstantiation) Expression<AnyVal, AnyVal::Super>;
+%template(AnyTypeInstantiation) DeriveToBase<Expression, AnyVal, AnyVal, AnyVal, AnyVal>;
+
+%inline %{
+AnyVal takeAnyVal(DeriveToBase<Expression, AnyVal, AnyVal, AnyVal, AnyVal> av) {
+  return av;
+}
+%}
+#endif

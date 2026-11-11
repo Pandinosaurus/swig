@@ -132,7 +132,7 @@ namespace Swig {
     }
 
   public:
-    virtual ~DirectorException() throw() {
+    virtual ~DirectorException() SWIG_NOEXCEPT {
     }
 
     VALUE getType() const {
@@ -148,7 +148,7 @@ namespace Swig {
       return swig_msg;
     }
 
-    const char *what() const throw() {
+    const char *what() const SWIG_NOEXCEPT {
       return swig_msg.c_str();
     }
   };
@@ -202,37 +202,6 @@ namespace Swig {
     }
   };
 
-  /* Simple thread abstraction for pthreads on win32 */
-#ifdef __THREAD__
-# define __PTHREAD__
-# if defined(_WIN32) || defined(__WIN32__)
-#  define pthread_mutex_lock EnterCriticalSection
-#  define pthread_mutex_unlock LeaveCriticalSection
-#  define pthread_mutex_t CRITICAL_SECTION
-#  define SWIG_MUTEX_INIT(var) var
-# else
-#  include <pthread.h>
-#  define SWIG_MUTEX_INIT(var) var = PTHREAD_MUTEX_INITIALIZER
-# endif
-#endif
-
-#ifdef  __PTHREAD__
-  struct Guard {
-    pthread_mutex_t *_mutex;
-
-    Guard(pthread_mutex_t &mutex) : _mutex(&mutex) {
-      pthread_mutex_lock(_mutex);
-    }
-
-    ~Guard() {
-      pthread_mutex_unlock(_mutex);
-    }
-  };
-# define SWIG_GUARD(mutex) Guard _guard(mutex)
-#else
-# define SWIG_GUARD(mutex)
-#endif
-
   /* director base class */
   class Director {
   private:
@@ -266,15 +235,13 @@ namespace Swig {
   private:
     typedef std::map<void *, GCItem_var> swig_ownership_map;
     mutable swig_ownership_map swig_owner;
-#ifdef __PTHREAD__
-    static pthread_mutex_t swig_mutex_own;
-#endif
+    SWIG_GUARD_DECLARATION(swig_mutex_own)
 
   public:
     template <typename Type>
     void swig_acquire_ownership_array(Type *vptr) const {
       if (vptr) {
-	SWIG_GUARD(swig_mutex_own);
+	SWIG_GUARD(swig_mutex_own)
 	swig_owner[vptr] = new GCArray_T<Type>(vptr);
       }
     }
@@ -282,14 +249,14 @@ namespace Swig {
     template <typename Type>
     void swig_acquire_ownership(Type *vptr)  const {
       if (vptr) {	
-	SWIG_GUARD(swig_mutex_own);
+	SWIG_GUARD(swig_mutex_own)
 	swig_owner[vptr] = new GCItem_T<Type>(vptr);
       }
     }
 
     void swig_acquire_ownership_obj(void *vptr, swig_ruby_owntype own) const {
       if (vptr && own.datafree) {
-	SWIG_GUARD(swig_mutex_own);
+	SWIG_GUARD(swig_mutex_own)
 	swig_owner[vptr] = new GCItem_Object(own);
       }
     }
@@ -297,7 +264,7 @@ namespace Swig {
     swig_ruby_owntype swig_release_ownership(void *vptr) const {
       swig_ruby_owntype own = {0, 0};
       if (vptr) {
-	SWIG_GUARD(swig_mutex_own);
+	SWIG_GUARD(swig_mutex_own)
 	swig_ownership_map::iterator iter = swig_owner.find(vptr);
 	if (iter != swig_owner.end()) {
 	  own.datafree = iter->second->get_own().datafree;
@@ -307,5 +274,6 @@ namespace Swig {
       return own;
     }
   };
+  SWIG_GUARD_DEFINITION(Director, swig_mutex_own)
 }
 

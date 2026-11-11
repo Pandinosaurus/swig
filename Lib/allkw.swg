@@ -1,5 +1,5 @@
-#ifndef __Lib_allkw_swg__
-#define __Lib_allkw_swg__
+#ifndef SWIG_INCLUDED_LIB_ALLKW_SWG
+#define SWIG_INCLUDED_LIB_ALLKW_SWG
 
 
 /*  
@@ -16,10 +16,12 @@
   
 */
 
+%include <c/ckw.swg>
 %include <csharp/csharpkw.swg>
 %include <d/dkw.swg>
 %include <go/gokw.swg>
 %include <java/javakw.swg>
+%include <javascript/javascriptkw.swg>
 %include <lua/luakw.swg>
 %include <ocaml/ocamlkw.swg>
 %include <perl5/perlkw.swg>
@@ -30,4 +32,4 @@
 %include <tcl/tclkw.swg>
 
 
-#endif //__Lib_allkw_swg__
+#endif // SWIG_INCLUDED_LIB_ALLKW_SWG

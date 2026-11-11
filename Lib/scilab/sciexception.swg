@@ -2,8 +2,6 @@
  * Exception typemaps (throws)
  */
 
-%include <exception.i>
-
 %typemap(throws, noblock=1) int, unsigned int, signed int,
                             int&,unsigned int&, signed int&,
                             long, unsigned long, signed long,
@@ -17,20 +15,20 @@
                             size_t, size_t&,
                             ptrdiff_t, ptrdiff_t& {
   char obj[20];
-  sprintf(obj, "%d", (int)$1);
+  SWIG_snprintf(obj, sizeof(obj), "%d", (int)$1);
   SWIG_Scilab_Raise_Ex(obj, "$type", $descriptor);
 }
 
 %typemap(throws, noblock=1) enum SWIGTYPE {
   char obj[20];
-  sprintf(obj, "%d", (int)$1);
+  SWIG_snprintf(obj, sizeof(obj), "%d", (int)$1);
   SWIG_Scilab_Raise_Ex(obj, "$type", $descriptor);
 }
 
 %typemap(throws, noblock=1) float, double,
                             float&, double& {
   char obj[20];
-  sprintf(obj, "%5.3f", (double)$1);
+  SWIG_snprintf(obj, sizeof(obj), "%5.3f", (double)$1);
   SWIG_Scilab_Raise_Ex(obj, "$type", $descriptor);
 }
 
@@ -44,7 +42,8 @@
 
 %typemap(throws, noblock=1) char, char& {
   char obj[2];
-  sprintf(obj, "%c", (char)$1);
+  obj[0] = (char)$1;
+  obj[1] = 0;
   SWIG_Scilab_Raise_Ex(obj, "$type", $descriptor);
 }
 
@@ -53,8 +52,4 @@
                             SWIGTYPE [ANY],
                             SWIGTYPE & {
   SWIG_Scilab_Raise_Ex((char*)NULL, "$type", $descriptor);
-}
-
-%typemap(throws, noblock=1) (...) {
-  SWIG_exception(SWIG_RuntimeError, "unknown exception");
 }

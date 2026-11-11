@@ -8,7 +8,10 @@ check(jaguar(200, 0), "hello")
 check(lotus("foo", 1), 101)
 check(tvr("bar", 2), 8.8)
 check(ferrari(), 101)
+check(cvar.called_argout, 1)
+check(cvar.called_freearg, 1)
 check(fiat(17), 17)
+check(peugeot(), 5)
 
 car = SportsCars()
 check(car.daimler(200, 0), "hello")
@@ -16,6 +19,7 @@ check(car.astonmartin("foo", 1), 101)
 check(car.bugatti("bar", 2), 8.8)
 check(car.lamborghini(), 101)
 check(car.maseratti(289), 289)
+check(car.audi(), 8.8)  # Typemap overrides default argument
 
 MiniCooper(200, 0)
 MorrisMinor("baz", 0)

@@ -5,7 +5,6 @@
 
 %insert("init") "swiginit.swg"
 %insert("runtime") "swigrun.swg"
-%insert("runtime") "swigerrors.swg"
 %insert("runtime") "rrun.swg"
 
 %init %{
@@ -26,9 +25,13 @@ SWIGEXPORT void SWIG_init(void) {
    assign(name, _obj);
 %end_block %enddef
 
-%define %raise(obj,type,desc) 
-return R_NilValue;
-%enddef
+%runtime %{
+SWIGINTERN void SWIG_R_Raise(SEXP obj, const char *msg) {
+  Rf_error("%s", Rf_isString(obj) ? CHAR(Rf_asChar(obj)) : msg);
+}
+%}
+
+#define %raise(OBJ, TYPE, DESC) SWIG_R_Raise(OBJ, "C/C++ exception of type " TYPE); return R_NilValue
 
 %insert("sinit") "srun.swg"
 
@@ -39,7 +42,7 @@ SWIG_InitializeModule(0);
 
 %include <typemaps/swigmacros.swg>
 %typemap(in) (double *x, int len) %{
-   $1 = REAL(x);
+   $1 = Rf_isNull(x) ? 0 : REAL(x);
    $2 = Rf_length(x);
 %}
 
@@ -53,58 +56,58 @@ SWIG_InitializeModule(0);
       assert(all(sapply($input, class) == "$R_class"));
   %}
 
-%typemap(out) void "";
+%typemap(out) void ""
 
-%typemap(in) int *, int[ANY],
-	     signed int *, signed int[ANY],
-	     unsigned int *, unsigned int[ANY],
-             short *, short[ANY],
-             signed short *, signed short[ANY],
-             unsigned short *, unsigned short[ANY],
-             long *, long[ANY],
-             signed long *, signed long[ANY],
-             unsigned long *, unsigned long[ANY],
-             long long *, long long[ANY],
-             signed long long *, signed long long[ANY],
-             unsigned long long *, unsigned long long[ANY]
+%typemap(in) int *,
+	     signed int *,
+	     unsigned int *,
+             short *,
+             signed short *,
+             unsigned short *,
+             long *,
+             signed long *,
+             unsigned long *,
+             long long *,
+             signed long long *,
+             unsigned long long *
              
 {
 { int _rswigi;
-  int _rswiglen = LENGTH($input);
-  $1 = %static_cast(calloc(sizeof($1_basetype), _rswiglen), $1_ltype);
+  int _rswiglen = Rf_length($input);
+  $1 = Rf_isNull($input) ? 0 : %static_cast(calloc(sizeof($1_basetype), _rswiglen ? _rswiglen : 1), $1_ltype);
   for (_rswigi=0; _rswigi< _rswiglen; _rswigi++) {
      $1[_rswigi] = INTEGER($input)[_rswigi];
   }
 }
 } 
 
-%typemap(in) float *, float[ANY],
-             double *, double[ANY]
+%typemap(in) float *,
+             double *
              
 {
 {  int _rswigi;
-  int _rswiglen = LENGTH($input);
-  $1 = %static_cast(calloc(sizeof($1_basetype), _rswiglen), $1_ltype);
+  int _rswiglen = Rf_length($input);
+  $1 = Rf_isNull($input) ? 0 : %static_cast(calloc(sizeof($1_basetype), _rswiglen ? _rswiglen : 1), $1_ltype);
   for (_rswigi=0; _rswigi<_rswiglen; _rswigi++) {
      $1[_rswigi] = REAL($input)[_rswigi];
   }
 }
 }
 
-%typemap(freearg,noblock=1) int *, int[ANY], 
-	     signed int *, signed int[ANY],
-	     unsigned int *, unsigned int[ANY],
-             short *, short[ANY],
-             signed short *, signed short[ANY],
-             unsigned short *, unsigned short[ANY],
-             long *, long[ANY],
-             signed long *, signed long[ANY],
-             unsigned long *, unsigned long[ANY],
-             long long *, long long[ANY],
-             signed long long *, signed long long[ANY],
-             unsigned long long *, unsigned long long[ANY],
-             float *, float[ANY],
-             double *, double[ANY]
+%typemap(freearg,noblock=1,match="in") int *,
+	     signed int *,
+	     unsigned int *,
+             short *,
+             signed short *,
+             unsigned short *,
+             long *,
+             signed long *,
+             unsigned long *,
+             long long *,
+             signed long long *,
+             unsigned long long *,
+             float *,
+             double *
 %{             
   free($1);
 %}
@@ -125,7 +128,32 @@ float *OUTPUT,
 double *OUTPUT,
 char *OUTPUT,
 signed char *OUTPUT,
-unsigned char *OUTPUT
+unsigned char *OUTPUT,
+size_t *OUTPUT,
+std::size_t *OUTPUT,
+ptrdiff_t *OUTPUT,
+std::ptrdiff_t *OUTPUT,
+int *INOUT,
+signed int *INOUT,
+unsigned int *INOUT,
+short *INOUT,
+signed short *INOUT,
+unsigned short *INOUT,
+long *INOUT,
+signed long *INOUT,
+unsigned long *INOUT,
+long long *INOUT,
+signed long long *INOUT,
+unsigned long long *INOUT,
+float *INOUT,
+double *INOUT,
+char *INOUT,
+signed char *INOUT,
+unsigned char *INOUT,
+size_t *INOUT,
+std::size_t *INOUT,
+ptrdiff_t *INOUT,
+std::ptrdiff_t *INOUT
 {}
 
 
@@ -137,18 +165,6 @@ unsigned char *OUTPUT
 #  assert(length($input) >= $1_dim0)
 %}
 
-/* Handling vector case to avoid warnings,
-   although we just use the first one. */
-%typemap(scheck) unsigned int %{
-  assert(length($input) == 1 && $input >= 0, "All values must be non-negative");
-%}
-
-
-%typemap(scheck) int, long %{
-  if(length($input) > 1) {
-     warning("using only the first element of $input");
-  };
-%}
 
 %include <typemaps/fragments.swg>
 %include <rfragments.swg>
@@ -156,65 +172,203 @@ unsigned char *OUTPUT
 %include <typemaps/swigtypemaps.swg>
 %include <rtype.swg>
 
-%typemap(in,noblock=1) enum SWIGTYPE[ANY] {
-   $1 = %reinterpret_cast(INTEGER($input), $1_ltype);
+/* A fixed size array is copied from a vector of up to that many elements, any after a shorter vector being 0. It is
+   returned as a vector of that many elements */
+%define %r_fixed_size_array(TYPE, SEXPTYPE, ELEMENT, ELEMENT_TYPE)
+%typemap(in,noblock=1) TYPE [ANY] ($*1_ltype temp[$1_dim0], int i, int len) {
+  len = Rf_length($input);
+  if (len > (int)($1_dim0)) {
+    %argument_fail(SWIG_OverflowError, "$type", $symname, $argnum);
+  }
+  for (i = 0; i < len; i++)
+    temp[i] = ($*1_ltype)ELEMENT($input)[i];
+  for (; i < (int)($1_dim0); i++)
+    temp[i] = ($*1_ltype)0;
+  $1 = Rf_isNull($input) ? 0 : temp;
 }
+%typemap(freearg) TYPE [ANY] ""
+/* A C99 variable length array parameter, as in 'int n, int a[n]', is copied into an array of the size it has at runtime */
+%typemap(in,noblock=1) TYPE [*] ($*1_ltype *temp = 0, int i, int len) {
+  if (!Rf_isNull($input)) {
+    len = Rf_length($input);
+    if (!(($1_dim0) > 0)) {
+      %argument_fail(SWIG_ValueError, "$type", $symname, $argnum);
+    }
+    if (len > (int)($1_dim0)) {
+      %argument_fail(SWIG_OverflowError, "$type", $symname, $argnum);
+    }
+    temp = %new_array((size_t)($1_dim0), $*1_ltype);
+    if (!temp) {
+      %argument_fail(SWIG_MemoryError, "$type", $symname, $argnum);
+    }
+    for (i = 0; i < len; i++) {
+      temp[i] = ($*1_ltype)ELEMENT($input)[i];
+    }
+  }
+  $1 = temp;
+}
+%typemap(freearg,noblock=1,match="in") TYPE [*] {
+  %delete_array(temp$argnum);
+}
+%typemap(out,noblock=1) TYPE [ANY] (int i) {
+  $result = Rf_allocVector(SEXPTYPE, $1_dim0);
+  for (i = 0; i < (int)($1_dim0); i++)
+    ELEMENT($result)[i] = (ELEMENT_TYPE)$1[i];
+}
+%enddef
+
+%r_fixed_size_array(int, INTSXP, INTEGER, int)
+%r_fixed_size_array(signed int, INTSXP, INTEGER, int)
+%r_fixed_size_array(unsigned int, INTSXP, INTEGER, int)
+%r_fixed_size_array(short, INTSXP, INTEGER, int)
+%r_fixed_size_array(signed short, INTSXP, INTEGER, int)
+%r_fixed_size_array(unsigned short, INTSXP, INTEGER, int)
+%r_fixed_size_array(long, INTSXP, INTEGER, int)
+%r_fixed_size_array(signed long, INTSXP, INTEGER, int)
+%r_fixed_size_array(unsigned long, INTSXP, INTEGER, int)
+%r_fixed_size_array(long long, INTSXP, INTEGER, int)
+%r_fixed_size_array(signed long long, INTSXP, INTEGER, int)
+%r_fixed_size_array(unsigned long long, INTSXP, INTEGER, int)
+%r_fixed_size_array(signed char, INTSXP, INTEGER, int)
+%r_fixed_size_array(unsigned char, INTSXP, INTEGER, int)
+%r_fixed_size_array(size_t, INTSXP, INTEGER, int)
+%r_fixed_size_array(std::size_t, INTSXP, INTEGER, int)
+%r_fixed_size_array(ptrdiff_t, INTSXP, INTEGER, int)
+%r_fixed_size_array(std::ptrdiff_t, INTSXP, INTEGER, int)
+%r_fixed_size_array(enum SWIGTYPE, INTSXP, INTEGER, int)
+%r_fixed_size_array(float, REALSXP, REAL, double)
+%r_fixed_size_array(double, REALSXP, REAL, double)
 
 %typemap(in,noblock=1,fragment="SWIG_strdup") char * {
-   $1 = %reinterpret_cast(SWIG_strdup(CHAR(STRING_ELT($input, 0))), $1_ltype);
+  if (!Rf_isNull($input) && Rf_length($input) != 1) {
+    %argument_fail(SWIG_TypeError, "$type", $symname, $argnum);
+  }
+  $1 = Rf_isNull($input) ? 0 : %reinterpret_cast(SWIG_strdup(CHAR(Rf_asChar($input))), $1_ltype);
 }
 
-%typemap(freearg,noblock=1) char * {
+%typemap(freearg,noblock=1,match="in") char * {
    free($1);
 }
 
-%typemap(in,noblock=1,fragment="SWIG_strdup") char *[ANY]  {
-   $1 = %reinterpret_cast(SWIG_strdup(CHAR(STRING_ELT($input, 0))), $1_ltype);
+%typemap(in,noblock=1,fragment="SWIG_strdup") char *[ANY] (char *temp[$1_dim0], char *copies[$1_dim0]) {
+  if (!Rf_isNull($input)) {
+    int i;
+    int len = Rf_length($input);
+    if (!Rf_isString($input)) {
+      %argument_fail(SWIG_TypeError, "$type", $symname, $argnum);
+    }
+    if (len > (int)($1_dim0)) {
+      %argument_fail(SWIG_OverflowError, "$type", $symname, $argnum);
+    }
+    for (i = 0; i < len; i++) {
+      copies[i] = temp[i] = SWIG_strdup(CHAR(STRING_ELT($input, i)));
+    }
+    for (; i < (int)($1_dim0); i++) {
+      copies[i] = temp[i] = 0;
+    }
+    $1 = temp;
+  }
 }
 
-%typemap(freearg,noblock=1) char *[ANY]  {
-   free($1);
+/* Frees the strings from the in typemap, which the wrapped function may have replaced in the array */
+%typemap(freearg,noblock=1,match="in") char *[ANY] {
+  if ($1) {
+    int i;
+    for (i = 0; i < (int)($1_dim0); i++) {
+      free(copies$argnum[i]);
+    }
+  }
 }
 
-%typemap(in,noblock=1,fragment="SWIG_strdup") char[ANY] {
-    $1 = SWIG_strdup(CHAR(STRING_ELT($input, 0)));
+/* A C99 variable length array parameter, as in 'int n, char *names[n]', is copied into an array of its runtime size */
+%typemap(in,noblock=1,fragment="SWIG_strdup") char *[*] (char **temp = 0, char **copies = 0, int len = 0) {
+  if (!Rf_isNull($input)) {
+    int i;
+    len = Rf_length($input);
+    if (!Rf_isString($input)) {
+      %argument_fail(SWIG_TypeError, "$type", $symname, $argnum);
+    }
+    if (!(($1_dim0) > 0)) {
+      %argument_fail(SWIG_ValueError, "$type", $symname, $argnum);
+    }
+    if (len > (int)($1_dim0)) {
+      %argument_fail(SWIG_OverflowError, "$type", $symname, $argnum);
+    }
+    temp = %new_array((size_t)($1_dim0), char *);
+    copies = %new_array((size_t)($1_dim0), char *);
+    if (!temp || !copies) {
+      len = 0;
+      %argument_fail(SWIG_MemoryError, "$type", $symname, $argnum);
+    }
+    for (i = 0; i < len; i++) {
+      copies[i] = temp[i] = SWIG_strdup(CHAR(STRING_ELT($input, i)));
+    }
+    $1 = temp;
+  }
 }
 
-%typemap(freearg,noblock=1) char[ANY] {
-    free($1);
+%typemap(freearg,noblock=1,match="in") char *[*] {
+  if (copies$argnum) {
+    int i;
+    for (i = 0; i < len$argnum; i++) {
+      free(copies$argnum[i]);
+    }
+  }
+  %delete_array(copies$argnum);
+  %delete_array(temp$argnum);
 }
 
+/* A variable keeps copies of the strings, as for char *, as freearg frees those from the in typemap */
+%define %r_char_ptr_array_variable(METHOD)
+%typemap(METHOD,canthrow=1,noblock=1,fragment="<string.h>") char *[ANY] {
+  if (!$input) {
+    SWIG_exception(SWIG_NullReferenceError, "invalid null reference in variable '$name' of type '$1_type'");
+  } else {
+    size_t ii;
+    for (ii = 0; ii < (size_t)$1_dim0; ii++) {
+      %delete_array($1[ii]);
+      $1[ii] = $input[ii] ? strcpy(%new_array(strlen($input[ii]) + 1, char), $input[ii]) : 0;
+    }
+  }
+}
+%enddef
+%r_char_ptr_array_variable(memberin)
+%r_char_ptr_array_variable(globalin)
+
+/* char[ANY] uses the Lib/typemaps typemaps, which copy the string into a zero filled array of the declared size */
 %typemap(in,noblock=1,fragment="SWIG_strdup") char[] {
-    $1 = SWIG_strdup(CHAR(STRING_ELT($input, 0)));
+    if (Rf_isNull($input)) {
+      $1 = 0;
+    } else {
+      if (Rf_length($input) != 1) {
+        %argument_fail(SWIG_TypeError, "$type", $symname, $argnum);
+      }
+      $1 = SWIG_strdup(CHAR(Rf_asChar($input)));
+    }
 }
 
-%typemap(freearg,noblock=1) char[] {
+%typemap(freearg,noblock=1,match="in") char[] {
     free($1);
 }
 
-%typemap(in) const enum SWIGTYPE & ($*1_ltype temp)
-%{ temp = ($*1_ltype)INTEGER($input)[0];
-   $1 = &temp; %}
+%typemap(in,noblock=1) const enum SWIGTYPE & ($*1_ltype temp) {
+  if (Rf_length($input) != 1) {
+    %argument_fail(SWIG_TypeError, "$type", $symname, $argnum);
+  }
+  temp = ($*1_ltype)Rf_asInteger($input);
+  $1 = &temp;
+}
 
 %typemap(out) const enum SWIGTYPE & %{ $result = Rf_ScalarInteger((int)*$1); %}
-
-%typemap(memberin) char[] %{
-if ($input) strcpy($1, $input);
-else
-strcpy($1, "");
-%}
-
-%typemap(globalin) char[] %{
-if ($input) strcpy($1, $input);
-else
-strcpy($1, "");
-%}
 
 %typemap(out,noblock=1) char * 
  {  $result = $1 ? Rf_mkString(%reinterpret_cast($1,char *)) : R_NilValue; }
 
 %typemap(in,noblock=1) char {
-$1 = %static_cast(CHAR(STRING_ELT($input, 0))[0],$1_ltype);
+  if (Rf_length($input) != 1) {
+    %argument_fail(SWIG_TypeError, "$type", $symname, $argnum);
+  }
+  $1 = %static_cast(CHAR(Rf_asChar($input))[0],$1_ltype);
 }
 
 %typemap(out) char 
@@ -227,15 +381,23 @@ $1 = %static_cast(CHAR(STRING_ELT($input, 0))[0],$1_ltype);
 
 %typemap(in,noblock=1) int, long
 {
-  $1 = %static_cast(INTEGER($input)[0], $1_ltype);
+  if (Rf_length($input) != 1) {
+    %argument_fail(SWIG_TypeError, "$type", $symname, $argnum);
+  }
+  $1 = %static_cast(Rf_asInteger($input), $1_ltype);
 }
 
 %typemap(out,noblock=1) int, long
   "$result = Rf_ScalarInteger($1);";
 
 
-%typemap(in,noblock=1) bool 
-  "$1 = LOGICAL($input)[0] ? true : false;";
+%typemap(in,noblock=1) bool
+{
+  if (Rf_length($input) != 1) {
+    %argument_fail(SWIG_TypeError, "$type", $symname, $argnum);
+  }
+  $1 = Rf_asLogical($input) ? true : false;
+}
 
 
 %typemap(out,noblock=1) bool 
@@ -245,7 +407,10 @@ $1 = %static_cast(CHAR(STRING_ELT($input, 0))[0],$1_ltype);
              float, 
              double
 {
-  $1 = %static_cast(REAL($input)[0], $1_ltype); 
+  if (Rf_length($input) != 1) {
+    %argument_fail(SWIG_TypeError, "$type", $symname, $argnum);
+  }
+  $1 = %static_cast(Rf_asReal($input), $1_ltype);
 }
 
 /* Why is this here ? */
@@ -268,6 +433,18 @@ x
 
 setAs('ExternalReference', 'character',
 function(from) {if (!is.null(from$"__str__")) from$"__str__"()})
+
+# A class's $ and $<- methods call these for a name that is not a member variable or method, or is read only
+setMethod('$', "ExternalReference",
+function(x, name) NULL)
+
+setMethod('$<-', "ExternalReference",
+function(x, name, value)
+stop("Unable to set '", name, "' of ", class(x)[1], ", as it is read only or not a member variable"))
+
+setMethod('[[<-', c("ExternalReference", "character"),
+function(x, i, j, ..., value)
+stop("Unable to set '", i, "' of ", class(x)[1], ", as it is read only or not a member variable"))
 
 suppressMessages(suppressWarnings(setMethod('print', 'ExternalReference',
 function(x) {print(as(x, "character"))})))

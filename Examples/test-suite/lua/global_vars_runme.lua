@@ -1,11 +1,5 @@
-require("import")	-- the import fn
-import("global_vars")	-- import lib
-gv = global_vars
-
--- catch "undefined" global variables
-local env = _ENV -- Lua 5.2
-if not env then env = getfenv () end -- Lua 5.1
-setmetatable(env, {__index=function (t,i) error("undefined global variable `"..i.."'",2) end})
+gv=require("global_vars")
+catch_undef_globs() -- catch "undefined" global variables
 
 gv.b = "abcde"
 assert(gv.b == "abcde")
@@ -17,6 +11,10 @@ a1 = gv.A()
 a1.x = 11
 gv.a = a1
 assert(gv.a.x == 11)
+assert(gv.acvp.x == 11)
+
+gv.avp = a1
+assert(gv.avp.x == 11)
 
 gv.x = 10
 assert(gv.x == 10)
@@ -27,6 +25,8 @@ assert(gv.Hola ~= nil)
 gv.h = gv.Hi
 assert(gv.h == gv.Hi)
 
+gv.assign_hp(gv.hcpr)
+assert(swig_type(gv.hp) == swig_type(gv.hcp))
 
 -- It is not clear whether these tests should work or not
 -- Currently they don't.

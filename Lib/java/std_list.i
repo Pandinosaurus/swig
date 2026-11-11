@@ -10,7 +10,6 @@
 
 %{
 #include <list>
-#include <stdexcept>
 %}
 
 %fragment("SWIG_ListSize", "header", fragment="SWIG_JavaIntFromSize_t") {
@@ -22,6 +21,7 @@ SWIGINTERN jint SWIG_ListSize(size_t size) {
 }
 }
 
+%javamethodmodifiers std::list::push_back "private";
 %javamethodmodifiers std::list::begin "private";
 %javamethodmodifiers std::list::insert "private";
 %javamethodmodifiers std::list::doSize "private";
@@ -39,7 +39,8 @@ namespace std {
 
 %typemap(javabase) std::list<T> "java.util.AbstractSequentialList<$typemap(jboxtype, T)>"
 %proxycode %{
-  public $javaclassname(java.util.Collection c) {
+  @SuppressWarnings("this-escape")
+  public $javaclassname(java.util.Collection<? extends $typemap(jboxtype, T)> c) {
     this();
     java.util.ListIterator<$typemap(jboxtype, T)> it = listIterator(0);
     // Special case the "copy constructor" here to avoid lots of cross-language calls
@@ -53,7 +54,7 @@ namespace std {
   }
 
   public boolean add($typemap(jboxtype, T) value) {
-    addLast(value);
+    push_back(value);
     return true;
   }
 
@@ -66,7 +67,7 @@ namespace std {
         if (index < 0 || index > $javaclassname.this.size())
           throw new IndexOutOfBoundsException("Index: " + index);
         pos = $javaclassname.this.begin();
-	pos = pos.advance_unchecked(index);
+        pos = pos.advance_unchecked(index);
         return this;
       }
 
@@ -168,7 +169,7 @@ namespace std {
 	  return **$self;
 	}
 
-	iterator advance_unchecked(size_type index) const {
+	iterator advance_unchecked(int index) const {
 	  std::list<T>::iterator ret = *$self;
 	  std::advance(ret, index);
 	  return ret;
@@ -184,14 +185,7 @@ namespace std {
     void clear();
     %rename(remove) erase;
     iterator erase(iterator pos);
-    %rename(removeLast) pop_back;
-    void pop_back();
-    %rename(removeFirst) pop_front;
-    void pop_front();
-    %rename(addLast) push_back;
     void push_back(const T &value);
-    %rename(addFirst) push_front;
-    void push_front(const T &value);
     iterator begin();
     iterator end();
     iterator insert(iterator pos, const T &value);

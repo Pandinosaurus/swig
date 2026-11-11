@@ -5,6 +5,12 @@
 %rename(BoolSt) BoolStructure;
 #endif
 
+/* We had to rename this in the C++ API being wrapped due to a collision with
+ * a value typedef in newer ocaml headers, so use %rename to avoid having to
+ * update all the runme files which use it.
+ */
+%rename(value) bool_value;
+
 %warnfilter(SWIGWARN_TYPEMAP_SWIGTYPELEAK);                   /* memory leak when setting a ptr/ref variable */
 %warnfilter(SWIGWARN_RUBY_WRONG_NAME) constbool;         /* Ruby, wrong class name */
 
@@ -42,9 +48,12 @@ const bool& const_rbo(const bool& b) {
 const bool* const_pbo(const bool* b) {
     return b;
 }
+bool bo_const_ref(const bool& b) {
+    return b;
+}
 
 // helper function
-bool value(bool* b) {
+bool bool_value(const bool* b) {
     return *b;
 }
 
@@ -62,8 +71,6 @@ struct BoolStructure {
     m_rbool(m_bool2),
     m_const_pbool(m_pbool),
     m_const_rbool(m_rbool) {}
-private:
-  BoolStructure& operator=(const BoolStructure &);
 };
 %}
 

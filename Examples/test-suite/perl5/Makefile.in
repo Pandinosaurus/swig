@@ -7,6 +7,12 @@ PERL         = @PERL@
 SCRIPTSUFFIX = _runme.pl
 TEST_RUNNER  = $(srcdir)/run-perl-test.pl
 
+HAVE_CXX11   = @HAVE_CXX11@
+HAVE_CXX14   = @HAVE_CXX14@
+HAVE_CXX17   = @HAVE_CXX17@
+HAVE_CXX20   = @HAVE_CXX20@
+HAVE_CXX23   = @HAVE_CXX23@
+HAVE_CXX26   = @HAVE_CXX26@
 srcdir       = @srcdir@
 top_srcdir   = @top_srcdir@
 top_builddir = @top_builddir@
@@ -19,6 +25,9 @@ CPP_TEST_CASES += \
 	memberin1 \
 	director_nestedmodule \
 
+CPP11_TEST_CASES += \
+	cpp11_strongly_typed_enumerations_perl_const \
+
 C_TEST_CASES += \
 	li_cstring \
 	li_cdata_carrays \
@@ -27,10 +36,12 @@ C_TEST_CASES += \
 include $(srcdir)/../common.mk
 
 # Overridden variables here
-# none!
+
+# Ensure testsuite remains free from SWIG warnings.
+SWIGOPT += -Werror
 
 # Custom tests - tests with additional commandline options
-# none!
+cpp11_strongly_typed_enumerations_perl_const.cpptest: SWIGOPT += -const
 
 # Rules for the different types of tests
 %.cpptest:

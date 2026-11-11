@@ -42,8 +42,9 @@ static int SWIG_JavaArrayIn##JFUNCNAME (JNIEnv *jenv, JNITYPE **jarr, CTYPE **ca
   int i;
   jsize sz;
   if (!input) {
-    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null array");
-    return 0;
+    *jarr = 0;
+    *carr = 0;
+    return 1;
   }
   sz = JCALL1(GetArrayLength, jenv, input);
   *jarr = JCALL2(Get##JAVATYPE##ArrayElements, jenv, input, 0);
@@ -65,7 +66,10 @@ static int SWIG_JavaArrayIn##JFUNCNAME (JNIEnv *jenv, JNITYPE **jarr, CTYPE **ca
 
 static void SWIG_JavaArrayArgout##JFUNCNAME (JNIEnv *jenv, JNITYPE *jarr, CTYPE *carr, JNITYPE##Array input) {
   int i;
-  jsize sz = JCALL1(GetArrayLength, jenv, input);
+  jsize sz;
+  if (!input)
+    return;
+  sz = JCALL1(GetArrayLength, jenv, input);
   for (i=0; i<sz; i++)
     jarr[i] = (JNITYPE)carr[i];
   JCALL3(Release##JAVATYPE##ArrayElements, jenv, input, jarr, 0);
@@ -147,19 +151,19 @@ JAVA_ARRAYS_IMPL(double, jdouble, Double, Double)     /* double[] */
 %typemap(jstype) CTYPE[ANY], CTYPE[]            %{JTYPE[]%}
 
 %typemap(in) CTYPE[] (JNITYPE *jarr)
-%{  if (!SWIG_JavaArrayIn##JFUNCNAME(jenv, &jarr, (CTYPE **)&$1, $input)) return $null; %}
+%{  if (!SWIG_JavaArrayIn##JFUNCNAME(jenv, &jarr, ($&1_ltype)&$1, $input)) return $null; %}
 %typemap(in) CTYPE[ANY] (JNITYPE *jarr)
 %{  if ($input && JCALL1(GetArrayLength, jenv, $input) != $1_size) {
     SWIG_JavaThrowException(jenv, SWIG_JavaIndexOutOfBoundsException, "incorrect array size");
     return $null;
   }
-  if (!SWIG_JavaArrayIn##JFUNCNAME(jenv, &jarr, (CTYPE **)&$1, $input)) return $null; %}
+  if (!SWIG_JavaArrayIn##JFUNCNAME(jenv, &jarr, ($&1_ltype)&$1, $input)) return $null; %}
 %typemap(argout) CTYPE[ANY], CTYPE[] 
-%{ SWIG_JavaArrayArgout##JFUNCNAME(jenv, jarr$argnum, (CTYPE *)$1, $input); %}
+%{ SWIG_JavaArrayArgout##JFUNCNAME(jenv, jarr$argnum, ($1_ltype)$1, $input); %}
 %typemap(out) CTYPE[ANY]
-%{$result = SWIG_JavaArrayOut##JFUNCNAME(jenv, (CTYPE *)$1, $1_dim0); %}
+%{$result = SWIG_JavaArrayOut##JFUNCNAME(jenv, ($1_ltype)$1, $1_dim0); %}
 %typemap(out) CTYPE[] 
-%{$result = SWIG_JavaArrayOut##JFUNCNAME(jenv, (CTYPE *)$1, FillMeInAsSizeCannotBeDeterminedAutomatically); %}
+%{$result = SWIG_JavaArrayOut##JFUNCNAME(jenv, ($1_ltype)$1, FillMeInAsSizeCannotBeDeterminedAutomatically); %}
 %typemap(freearg) CTYPE[ANY], CTYPE[] 
 #ifdef __cplusplus
 %{ delete [] $1; %}
@@ -174,6 +178,9 @@ JAVA_ARRAYS_IMPL(double, jdouble, Double, Double)     /* double[] */
 
 %typemap(memberin) CTYPE[ANY], CTYPE[];
 %typemap(globalin) CTYPE[ANY], CTYPE[];
+
+/* A C99 variable length array parameter, as in 'int n, int a[n]', is handled as a fixed size array of its runtime size */
+%apply CTYPE[ANY] { CTYPE[*] };
 %enddef
 
 JAVA_ARRAYS_TYPEMAPS(bool, boolean, jboolean, Bool, "[Z")       /* bool[ANY] */
@@ -227,6 +234,12 @@ JAVA_ARRAYS_TYPEMAPS(double, double, jdouble, Double, "[D")     /* double[ANY] *
     double[ANY], double[]
     ""
 
+#if defined(SWIGWORDSIZE64)
+%apply long long[ANY] { long[ANY], long[*] };
+%apply unsigned long long[ANY] { unsigned long[ANY], unsigned long[*] };
+%apply long long[] { long[] };
+%apply unsigned long long[] { unsigned long[] };
+#endif
 
 /* Arrays of proxy classes. The typemaps in this macro make it possible to treat an array of 
  * class/struct/unions as an array of Java classes. 
@@ -244,69 +257,67 @@ JAVA_ARRAYS_TYPEMAPS(double, double, jdouble, Double, "[D")     /* double[ANY] *
     return $javaclassname.cArrayWrap($jnicall, $owner);
   }
 
-%typemap(in) ARRAYSOFCLASSES[] (jlong *jarr, jsize sz)
+%typemap(in) ARRAYSOFCLASSES[] (jlong *jarr = 0, jsize sz = 0)
 {
   int i;
-  if (!$input) {
-    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null array");
-    return $null;
-  }
-  sz = JCALL1(GetArrayLength, jenv, $input);
-  jarr = JCALL2(GetLongArrayElements, jenv, $input, 0);
-  if (!jarr) {
-    return $null;
-  }
+  if ($input) {
+    sz = JCALL1(GetArrayLength, jenv, $input);
+    jarr = JCALL2(GetLongArrayElements, jenv, $input, 0);
+    if (!jarr) {
+      return $null;
+    }
 #ifdef __cplusplus
-  $1 = new $*1_ltype[sz];
+    $1 = new $*1_ltype[sz];
 #else
-  $1 = ($1_ltype) malloc(sz * sizeof($*1_ltype));
+    $1 = ($1_ltype) malloc(sz * sizeof($*1_ltype));
 #endif
-  if (!$1) {
-    SWIG_JavaThrowException(jenv, SWIG_JavaOutOfMemoryError, "array memory allocation failed");
-    return $null;
-  }
-  for (i=0; i<sz; i++) {
-    $1[i] = **($&1_ltype)&jarr[i];
+    if (!$1) {
+      SWIG_JavaThrowException(jenv, SWIG_JavaOutOfMemoryError, "array memory allocation failed");
+      return $null;
+    }
+    for (i=0; i<sz; i++) {
+      $1[i] = **($&1_ltype)&jarr[i];
+    }
   }
 }
 
-%typemap(in) ARRAYSOFCLASSES[ANY] (jlong *jarr, jsize sz)
+%typemap(in) ARRAYSOFCLASSES[ANY] (jlong *jarr = 0, jsize sz = 0)
 {
   int i;
-  if (!$input) {
-    SWIG_JavaThrowException(jenv, SWIG_JavaNullPointerException, "null array");
-    return $null;
-  }
-  sz = JCALL1(GetArrayLength, jenv, $input);
-  if (sz != $1_size) {
-    SWIG_JavaThrowException(jenv, SWIG_JavaIndexOutOfBoundsException, "incorrect array size");
-    return $null;
-  }
-  jarr = JCALL2(GetLongArrayElements, jenv, $input, 0);
-  if (!jarr) {
-    return $null;
-  }
+  if ($input) {
+    sz = JCALL1(GetArrayLength, jenv, $input);
+    if (sz != $1_size) {
+      SWIG_JavaThrowException(jenv, SWIG_JavaIndexOutOfBoundsException, "incorrect array size");
+      return $null;
+    }
+    jarr = JCALL2(GetLongArrayElements, jenv, $input, 0);
+    if (!jarr) {
+      return $null;
+    }
 #ifdef __cplusplus
-  $1 = new $*1_ltype[sz];
+    $1 = new $*1_ltype[sz];
 #else
-  $1 = ($1_ltype) malloc(sz * sizeof($*1_ltype));
+    $1 = ($1_ltype) malloc(sz * sizeof($*1_ltype));
 #endif
-  if (!$1) {
-    SWIG_JavaThrowException(jenv, SWIG_JavaOutOfMemoryError, "array memory allocation failed");
-    return $null;
-  }
-  for (i=0; i<sz; i++) {
-    $1[i] = **($&1_ltype)&jarr[i];
+    if (!$1) {
+      SWIG_JavaThrowException(jenv, SWIG_JavaOutOfMemoryError, "array memory allocation failed");
+      return $null;
+    }
+    for (i=0; i<sz; i++) {
+      $1[i] = **($&1_ltype)&jarr[i];
+    }
   }
 }
 
 %typemap(argout) ARRAYSOFCLASSES[ANY], ARRAYSOFCLASSES[]
 {
-  int i;
-  for (i=0; i<sz$argnum; i++) {
-    **($&1_ltype)&jarr$argnum[i] = $1[i];
+  if ($input) {
+    int i;
+    for (i=0; i<sz$argnum; i++) {
+      **($&1_ltype)&jarr$argnum[i] = $1[i];
+    }
+    JCALL3(ReleaseLongArrayElements, jenv, $input, jarr$argnum, 0);
   }
-  JCALL3(ReleaseLongArrayElements, jenv, $input, jarr$argnum, 0);
 }
 
 %typemap(out) ARRAYSOFCLASSES[ANY]
@@ -335,11 +346,15 @@ JAVA_ARRAYS_TYPEMAPS(double, double, jdouble, Double, "[D")     /* double[ANY] *
 %{ free($1); %}
 #endif
 
+%apply ARRAYSOFCLASSES[ANY] { ARRAYSOFCLASSES[*] };
+
 /* Add some code to the proxy class of the array type for converting between type used in 
  * JNI class (long[]) and type used in proxy class ( ARRAYSOFCLASSES[] ) */
 %extend ARRAYSOFCLASSES {
 %proxycode %{
   protected static long[] cArrayUnwrap($javaclassname[] arrayWrapper) {
+      if (arrayWrapper == null)
+        return null;
       long[] cArray = new long[arrayWrapper.length];
       for (int i=0; i<arrayWrapper.length; i++)
         cArray[i] = $javaclassname.getCPtr(arrayWrapper[i]);
@@ -359,8 +374,9 @@ JAVA_ARRAYS_TYPEMAPS(double, double, jdouble, Double, "[D")     /* double[ANY] *
 
 
 /* Arrays of enums. 
- * Use the following to use these typemaps for an array of enums called name:
- * %apply ARRAYSOFENUMS[ANY] { name[ANY] }; */
+ * Use the following to use these typemaps for an array of enums called name,
+ * name[*] being for a C99 variable length array parameter:
+ *   %apply ARRAYSOFENUMS[ANY] { name[ANY], name[*] }; */
 %typemap(jni) ARRAYSOFENUMS[ANY], ARRAYSOFENUMS[] "jintArray"
 %typemap(jtype) ARRAYSOFENUMS[ANY], ARRAYSOFENUMS[] "int[]"
 %typemap(jstype) ARRAYSOFENUMS[ANY], ARRAYSOFENUMS[] "int[]"

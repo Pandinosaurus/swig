@@ -1,6 +1,8 @@
 # Note that this test is also used by python_default_args_runme.py hence
 # the use of __main__ and the run function
 
+from swig_test_utils import swig_check
+
 
 def run(module_name):
     default_args = __import__(module_name)
@@ -12,7 +14,7 @@ def run(module_name):
     de.accelerate()
     de.accelerate(default_args.EnumClass.SLOW)
 
-    if default_args.Statics_staticMethod() != 60:
+    if default_args.Statics.staticMethod() != 60:
         raise RuntimeError
 
     if default_args.cfunc1(1) != 2:
@@ -148,6 +150,21 @@ def run(module_name):
     if default_args.slightly_off_square() != 291:
         raise RuntimeError
 
+    if default_args.Q.slightly_off_square_static(10) != 102:
+        raise RuntimeError
+
+    # Regression test for https://github.com/swig/swig/issues/2786
+    if default_args.Q.slightly_off_square_static() != 291:
+        raise RuntimeError
+
+    q = default_args.Q()
+    if q.slightly_off_square(10) != 102:
+        raise RuntimeError
+
+    # Regression test for https://github.com/swig/swig/issues/2786
+    if q.slightly_off_square() != 291:
+        raise RuntimeError
+
     # It is difficult to test the python:cdefaultargs feature properly as -builtin
     # and -fastproxy do not use the Python layer for default args
     if default_args.CDA().cdefaultargs_test1() != 1:
@@ -173,6 +190,23 @@ def run(module_name):
 
     if default_args.chartest6() != "C":
         raise RuntimeError
+
+    default_args.wrapptr_0(1)
+    default_args.wrapptr_0l(1)
+    default_args.wrapptr_null(1)
+    default_args.wrapptr_nullptr(1)
+
+    swig_check(default_args.sizeof_subscript_default_arg(), 5)
+    swig_check(default_args.sizeof_subscript_count, 5)
+    swig_check(default_args.number_subscript_default_arg(), 3)
+    swig_check(default_args.new_subscript_default_arg(), 2)
+
+    size = default_args.sizeof_member_size()
+    swig_check(default_args.sizeof_member_constant, 2 * size)
+    swig_check(default_args.sizeof_member_default(), 2 * size)
+    swig_check(default_args.sizeof_member_default(1), 1 + size)
+    swig_check(default_args.sizeof_member_chain(), True)
+    swig_check(default_args.sizeof_member_chain(0), False)
 
 if __name__ == "__main__":
     run("default_args")

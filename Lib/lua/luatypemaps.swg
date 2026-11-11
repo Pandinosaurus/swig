@@ -24,7 +24,7 @@
 // additional check for unsigned numbers, to not permit negative input
 %typemap(in,checkfn="lua_isnumber") unsigned int,
              unsigned short, unsigned long, unsigned char
-%{SWIG_contract_assert((lua_tonumber(L,$input)>=0),"number must not be negative")
+%{SWIG_contract_assert((lua_tonumber(L,$input)>=0),"number must not be negative");
 $1 = ($type)lua_tonumber(L, $input);%}
 
 %typemap(out) int,short,long,
@@ -39,12 +39,12 @@ $1 = ($type)lua_tonumber(L, $input);%}
 // SWIG assumes that this code will need a pointer to int to be passed in
 // (this might be ok for objects by const ref, but not for numeric primitives)
 // therefore we add a set of typemaps to fix this (for both in & out)
-%typemap(in,checkfn="lua_isnumber") const int&($basetype temp)
-%{ temp=($basetype)lua_tonumber(L,$input); $1=&temp;%}
+%typemap(in,checkfn="lua_isnumber") const int&($*1_ltype temp)
+%{ temp=($*1_ltype)lua_tonumber(L,$input); $1=&temp;%}
 
-%typemap(in,checkfn="lua_isnumber") const unsigned int&($basetype temp)
-%{SWIG_contract_assert((lua_tonumber(L,$input)>=0),"number must not be negative")
-temp=($basetype)lua_tonumber(L,$input); $1=&temp;%}
+%typemap(in,checkfn="lua_isnumber") const unsigned int&($*1_ltype temp)
+%{SWIG_contract_assert((lua_tonumber(L,$input)>=0),"number must not be negative");
+temp=($*1_ltype)lua_tonumber(L,$input); $1=&temp;%}
 
 %typemap(out) const int&, const unsigned int&
 %{  lua_pushnumber(L, (lua_Number) *$1); SWIG_arg++;%}
@@ -106,26 +106,62 @@ SWIGINTERN int SWIG_lua_isnilstring(lua_State *L, int idx) {
 %typemap(in,checkfn="SWIG_lua_isnilstring",fragment="SWIG_lua_isnilstring") const char *, char *
 %{$1 = ($ltype)lua_tostring(L, $input);%}
 
-%typemap(in,checkfn="SWIG_lua_isnilstring",fragment="SWIG_lua_isnilstring") const char[ANY], char[ANY]
+%typemap(in,checkfn="SWIG_lua_isnilstring",fragment="SWIG_lua_isnilstring",fragment="SWIG_CopyCharArray")
+  const char[ANY] (char temp[$1_dim0]), char[ANY] (char temp[$1_dim0])
+%{$1 = 0;
+  if (!lua_isnil(L, $input)) {
+    size_t len = 0;
+    const char *str = lua_tolstring(L, $input, &len);
+    if (!SWIG_CopyCharArray(temp, $1_dim0, str, len)) {
+      SWIG_Lua_pusherrstring(L, "Error in $symname (arg $argnum), string too long for char array");
+      SWIG_fail;
+    }
+    $1 = ($ltype)temp;
+  }%}
+
+/* A C99 variable length array parameter, as in 'int n, char s[n]' */
+%typemap(in,checkfn="SWIG_lua_isnilstring",fragment="SWIG_lua_isnilstring",fragment="SWIG_NewCharArray") const char[*], char[*]
+%{$1 = 0;
+  if (!lua_isnil(L, $input)) {
+    size_t len = 0;
+    const char *str = lua_tolstring(L, $input, &len);
+    $1 = ($ltype)(($1_dim0) > 0 ? SWIG_NewCharArray((size_t)($1_dim0), str, len) : 0);
+    if (!$1) {
+      SWIG_Lua_pusherrstring(L, "Error in $symname (arg $argnum), string too long for char array");
+      SWIG_fail;
+    }
+  }%}
+%typemap(freearg) const char[*], char[*] %{free((char *)$1);%}
+
+%typemap(in,checkfn="SWIG_lua_isnilstring",fragment="SWIG_lua_isnilstring") const char[], char[]
 %{$1 = ($ltype)lua_tostring(L, $input);%}
 
 %typemap(out) const char *, char *
 %{  lua_pushstring(L,(const char *)$1); SWIG_arg++;%}
 
-%typemap(out) const char[ANY], char[ANY]
+%typemap(out,fragment="SWIG_CharArrayLength") const char[ANY], char[ANY]
+%{  if ($1) lua_pushlstring(L,(const char *)$1,SWIG_CharArrayLength((const char *)$1,$1_dim0)); else lua_pushnil(L); SWIG_arg++;%}
+
+%typemap(out) const char[], char[]
 %{  lua_pushstring(L,(const char *)$1); SWIG_arg++;%}
+
+%typemap(in,checkfn="SWIG_lua_isnilstring",fragment="SWIG_lua_isnilstring") char *& ($*1_ltype temp), const char *& ($*1_ltype temp)
+%{temp = ($*1_ltype)lua_tostring(L, $input); $1 = &temp;%}
+
+%typemap(out) char *&, const char *&
+%{  lua_pushstring(L,(const char *)*$1); SWIG_arg++;%}
 
 // char's
 // currently treating chars as small strings, not as numbers
 // (however signed & unsigned char's are numbers...)
-%typemap(in,checkfn="SWIG_lua_isnilstring",fragment="SWIG_lua_isnilstring") char
+%typemap(in,checkfn="lua_isstring") char
 %{$1 = (lua_tostring(L, $input))[0];%}
 
 %typemap(out) char
 %{  lua_pushlstring(L, &$1, 1); SWIG_arg++;%}
 
 // by const ref
-%typemap(in,checkfn="SWIG_lua_isnilstring",fragment="SWIG_lua_isnilstring") const char& (char temp)
+%typemap(in,checkfn="lua_isstring") const char& (char temp)
 %{temp = (lua_tostring(L, $input))[0]; $1=&temp;%}
 
 %typemap(out) const char&
@@ -151,11 +187,17 @@ SWIGINTERN int SWIG_lua_isnilstring(lua_State *L, int idx) {
   }
 %}
 
-%typemap(in,checkfn="lua_isuserdata") SWIGTYPE&&
-%{
-  if (!SWIG_IsOK(SWIG_ConvertPtr(L,$input,(void**)&$1,$descriptor,$disown))){
-    SWIG_fail_ptr("$symname",$argnum,$descriptor);
+%typemap(in,checkfn="lua_isuserdata",fragment="<memory>") SWIGTYPE&& (void *argp = 0, int res = 0, std::unique_ptr<$*1_ltype> rvrdeleter) %{
+  res = SWIG_ConvertPtr(L, $input, &argp, $descriptor, SWIG_POINTER_RELEASE);
+  if (!SWIG_IsOK(res)) {
+    if (res == SWIG_ERROR_RELEASE_NOT_OWNED) {
+      lua_pushfstring(L, "Cannot release ownership as memory is not owned for argument $argnum of type '$1_type' in $symname"); SWIG_fail;
+    } else {
+      SWIG_fail_ptr("$symname", $argnum, $descriptor);
+    }
   }
+  $1 = ($1_ltype)argp;
+  rvrdeleter.reset($1);
 %}
 
 // out is simple
@@ -217,7 +259,7 @@ $1=($1_ltype)&temp;%}
 #ifdef __cplusplus
 %typemap(out) SWIGTYPE
 {
-  $&1_ltype resultptr = new $1_ltype((const $1_ltype &) $1);
+  $&1_ltype resultptr = new $1_ltype($1);
   SWIG_NewPointerObj(L,(void *) resultptr,$&1_descriptor,1); SWIG_arg++;
 }
 #else
@@ -246,16 +288,31 @@ $1=($1_ltype)&temp;%}
   SWIG_NewMemberObj(L,(void*)(&$1),sizeof($1),$descriptor); SWIG_arg++;
 %}
 
+%typemap(in,checkfn="lua_isuserdata") (SWIGTYPE (CLASS::*const&)) ($*1_ltype temp)
+%{
+  if (!SWIG_IsOK(SWIG_ConvertMember(L,$input,(void*)(&temp),sizeof(temp),$*descriptor)))
+    SWIG_fail_ptr("$symname",$argnum,$*descriptor);
+  $1 = &temp;
+%}
+
+%typemap(out) SWIGTYPE (CLASS::*const&)
+%{
+  SWIG_NewMemberObj(L,(void*)($1),sizeof(*$1),$*descriptor); SWIG_arg++;
+%}
+
 
 // void (must be empty without the SWIG_arg++)
-%typemap(out) void "";
+%typemap(out) void ""
 
 /* void* is a special case
 A function void fn(void*) should take any kind of pointer as a parameter (just like C/C++ does)
-but if its an output, then it should be wrapped like any other SWIG object (using default typemap)
+but if it's an output, then it should be wrapped like any other SWIG object (using default typemap)
 */
 %typemap(in,checkfn="SWIG_isptrtype") void*
 %{$1=($1_ltype)SWIG_MustGetPtr(L,$input,0,0,$argnum,"$symname");%}
+%typemap(in,checkfn="SWIG_isptrtype") void *const& ($*1_ltype temp)
+%{temp=($*1_ltype)SWIG_MustGetPtr(L,$input,0,0,$argnum,"$symname");
+$1=&temp;%}
 
 /* long long is another special case:
 as lua only supports one numeric type (lua_Number), we will just
@@ -263,8 +320,10 @@ cast it to that & accept the loss of precision.
 An alternative solution would be a long long struct or class
 with the relevant operators.
 */
-%apply long {long long, signed long long, unsigned long long};
-%apply const long& {const long long&, const signed long long&, const unsigned long long&};
+%apply long {long long, signed long long};
+%apply unsigned long {unsigned long long};
+%apply const long& {const long long&, const signed long long&};
+%apply const unsigned long& {const unsigned long long&};
 
 /* It is possible to also pass a lua_State* into a function, so
 void fn(int a, float b, lua_State* s) is wrappable as
@@ -285,7 +344,7 @@ parameters match which function
 
 // unfortunately lua only considers one type of number
 // so all numbers (int,float,double) match
-// you could add an advanced fn to get type & check if its integral
+// you could add an advanced fn to get type & check if it's integral
 %typecheck(SWIG_TYPECHECK_INTEGER)
 	 int, short, long,
  	 unsigned int, unsigned short, unsigned long,
@@ -312,7 +371,7 @@ parameters match which function
   $1 = SWIG_lua_isnilstring(L,$input) && (lua_rawlen(L,$input)==1);
 }
 
-%typecheck(SWIG_TYPECHECK_STRING,fragment="SWIG_lua_isnilstring") char *, char[] {
+%typecheck(SWIG_TYPECHECK_STRING,fragment="SWIG_lua_isnilstring") char *, char[], char[ANY], char *&, const char *& {
   $1 = SWIG_lua_isnilstring(L,$input);
 }
 
@@ -352,7 +411,17 @@ parameters match which function
   }
 }
 
-%typecheck(SWIG_TYPECHECK_VOIDPTR) void * {
+%typecheck(SWIG_TYPECHECK_POINTER) SWIGTYPE (CLASS::*) %{
+  char swig_memberptr[sizeof($1_ltype)];
+  $1 = SWIG_IsOK(SWIG_ConvertMember(L, $input, swig_memberptr, sizeof(swig_memberptr), $descriptor));
+%}
+
+%typecheck(SWIG_TYPECHECK_POINTER) SWIGTYPE (CLASS::*const&) %{
+  char swig_memberptr[sizeof($*1_ltype)];
+  $1 = SWIG_IsOK(SWIG_ConvertMember(L, $input, swig_memberptr, sizeof(swig_memberptr), $*descriptor));
+%}
+
+%typecheck(SWIG_TYPECHECK_VOIDPTR) void *, void *const& {
   void *ptr;
   if (SWIG_isptrtype(L,$input)==0 || SWIG_ConvertPtr(L,$input, (void **) &ptr, 0, 0)) {
     $1 = 0;
@@ -380,12 +449,26 @@ parameters match which function
 
 // Array reference typemaps
 %apply SWIGTYPE & { SWIGTYPE ((&)[ANY]) }
-%apply SWIGTYPE && { SWIGTYPE ((&&)[ANY]) }
+%apply char[ANY] { char (&)[ANY], char (&&)[ANY] }
+/* Unlike for a char array, nil is not accepted, as a reference cannot be bound to NULL */
+%typemap(in,checkfn="lua_isstring",fragment="SWIG_CopyCharArray") char (&)[ANY] (char temp[$1_dim0]), char (&&)[ANY] (char temp[$1_dim0])
+%{{
+    size_t len = 0;
+    const char *str = lua_tolstring(L, $input, &len);
+    if (!SWIG_CopyCharArray(temp, $1_dim0, str, len)) {
+      SWIG_Lua_pusherrstring(L, "Error in $symname (arg $argnum), string too long for char array");
+      SWIG_fail;
+    }
+    $1 = ($ltype)temp;
+  }%}
+%typecheck(SWIG_TYPECHECK_STRING) char (&)[ANY], char (&&)[ANY] {
+  $1 = lua_isstring(L,$input);
+}
+%apply SWIGTYPE & { SWIGTYPE ((&&)[ANY]), SWIGTYPE ((&&)[]), SWIGTYPE ((&&)(ANY)) }
 
-/* const pointers */
-%apply SWIGTYPE * { SWIGTYPE *const }
+/* const and volatile pointers */
+%apply SWIGTYPE * { SWIGTYPE *const, SWIGTYPE *volatile, SWIGTYPE *const volatile }
 %apply SWIGTYPE (CLASS::*) { SWIGTYPE (CLASS::*const) }
-%apply SWIGTYPE & { SWIGTYPE (CLASS::*const&) }
 
 // size_t (which is just a unsigned long)
 %apply unsigned long { size_t };
@@ -396,7 +479,7 @@ parameters match which function
  *                          Specials
  * ----------------------------------------------------------------------------- */
 // swig::LANGUAGE_OBJ was added to allow containers of native objects
-// however its rather difficult to do this in lua, as you cannot hold pointers
+// however it's rather difficult to do this in lua, as you cannot hold pointers
 // to native objects (they are held in the interpreter)
 // therefore for now: just ignoring this feature
 #ifdef __cplusplus

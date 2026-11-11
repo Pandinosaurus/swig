@@ -43,6 +43,10 @@ typedef struct {
 
 void fn_taking_arrays(SimpleStruct array_struct[ARRAY_LEN]) {}
 
+double first_double_field(SimpleStruct array_struct[ARRAY_LEN]) {
+  return array_struct[0].double_field;
+}
+
 /* Pointer helper functions used in the Java run test */
 int* newintpointer() {
     return (int*)malloc(sizeof(int));
@@ -54,6 +58,15 @@ int getintfrompointer(int* intptr) {
     return *intptr;
 }
 
+%}
+
+%inline %{
+/* A function pointer type with an array parameter */
+typedef int (*IntArrayFunction)(const int array_i[ARRAY_LEN]);
+
+int call_int_array_function(IntArrayFunction f, const int array_i[ARRAY_LEN]) {
+  return f(array_i);
+}
 %}
 
 // This tests wrapping of function that involves pointer to array
@@ -73,4 +86,18 @@ typedef struct {
 cartPosition_t p;
 } CartPoseData_t;
 
+/* Test left shift in array size doesn't trigger "Bad template type" error.
+ * Regression test for https://sourceforge.net/p/swig/bugs/983/ */
+char array_shifted_size[(1<<2)];
+
+%}
+
+%warnfilter(SWIGWARN_TYPEMAP_VARIN_UNDEF) chars;
+
+%inline %{
+/* A flexible array member has no size to bound a copy into it, so is read only */
+typedef struct {
+  int len;
+  char chars[];
+} FlexibleCharArray;
 %}

@@ -61,38 +61,39 @@ SWIG_From_dec(unsigned long)(unsigned long value)
     return SWIG_From(long)(%numeric_cast(value, long));
   } else {
     char temp[256]; 
-    sprintf(temp, "%lu", value);
+    SWIG_snprintf(temp, sizeof(temp), "%lu", value);
     return Tcl_NewStringObj(temp,-1);
   }
 }
 }
 
 %fragment(SWIG_AsVal_frag(unsigned long),"header",
-	  fragment="<limits.h>") {
+	  fragment="<errno.h>",
+	  fragment="<limits.h>",
+	  fragment="<string.h>") {
 SWIGINTERN int
 SWIG_AsVal_dec(unsigned long)(Tcl_Obj *obj, unsigned long *val) {
   long v;
+  /* A negative v is a negative number or, with no minus sign, an unsigned value too big for a long, which
+     Tcl_GetLongFromObj wraps */
   if (Tcl_GetLongFromObj(0,obj, &v) == TCL_OK) {
-    if (v >= 0) {
+    if (v >= 0 || !strchr(Tcl_GetString(obj), '-')) {
       if (val) *val = (unsigned long) v;
       return SWIG_OK;
     }
-    /* If v is negative, then this could be a negative number, or an
-       unsigned value which doesn't fit in a signed long, so try to
-       get it as a string so we can distinguish these cases. */
+    return SWIG_OverflowError;
   }
   {
-    int len = 0;
+    Tcl_Size len = 0;
     const char *nptr = Tcl_GetStringFromObj(obj, &len);
     if (nptr && len > 0) {
       char *endptr;
       unsigned long v;
-      if (*nptr == '-') return SWIG_OverflowError;
       errno = 0;
       v = strtoul(nptr, &endptr,0);
       if (nptr[0] == '\0' || *endptr != '\0')
 	return SWIG_TypeError;
-      if (v == ULONG_MAX && errno == ERANGE) {
+      if ((v == ULONG_MAX && errno == ERANGE) || (v != 0 && strchr(nptr, '-'))) {
 	errno = 0;
 	return SWIG_OverflowError;
       } else {
@@ -122,7 +123,7 @@ SWIG_From_dec(long long)(long long value)
     return SWIG_From(long)(%numeric_cast(value,long));
   } else {    
     char temp[256]; 
-    sprintf(temp, "%lld", value);
+    SWIG_snprintf(temp, sizeof(temp), "%lld", value);
     return Tcl_NewStringObj(temp,-1);
   }
 }
@@ -136,30 +137,13 @@ SWIG_From_dec(long long)(long long value)
 SWIGINTERN int
 SWIG_AsVal_dec(long long)(Tcl_Obj *obj, long long *val)
 {
-  long v;
-  if (Tcl_GetLongFromObj(0,obj, &v) == TCL_OK) {
+  Tcl_WideInt v;
+  if (Tcl_GetWideIntFromObj(0, obj, &v) == TCL_OK) {
+    if (sizeof(v) > sizeof(*val) && (v < LLONG_MIN || v > LLONG_MAX)) {
+      return SWIG_OverflowError;
+    }
     if (val) *val = v;
     return SWIG_OK;
-  } else {
-    int len = 0;
-    const char *nptr = Tcl_GetStringFromObj(obj, &len);
-    if (nptr && len > 0) {
-      char *endptr;
-      long long v;
-      errno = 0;
-      v = strtoll(nptr, &endptr,0);
-      if (nptr[0] == '\0' || *endptr != '\0')
-	return SWIG_TypeError;
-      if ((v == LLONG_MAX || v == LLONG_MIN) && errno == ERANGE) {
-	errno = 0;
-	return SWIG_OverflowError;
-      } else {
-	if (*endptr == '\0') {
-	  if (val) *val = v;
-	  return SWIG_OK;
-	}
-      }
-    }
   }
   return SWIG_TypeError;
 }
@@ -180,7 +164,7 @@ SWIG_From_dec(unsigned long long)(unsigned long long value)
     return SWIG_From(long long)(%numeric_cast(value, long long));
   } else {
     char temp[256]; 
-    sprintf(temp, "%llu", value);
+    SWIG_snprintf(temp, sizeof(temp), "%llu", value);
     return Tcl_NewStringObj(temp,-1);
   }
 }
@@ -190,27 +174,29 @@ SWIG_From_dec(unsigned long long)(unsigned long long value)
 %fragment(SWIG_AsVal_frag(unsigned long long),"header",
 	  fragment=SWIG_AsVal_frag(unsigned long),
 	  fragment="SWIG_LongLongAvailable",
-	  fragment="<stdlib.h>") {
+	  fragment="<errno.h>",
+	  fragment="<stdlib.h>",
+	  fragment="<string.h>") {
 %#ifdef SWIG_LONG_LONG_AVAILABLE
 SWIGINTERN int
 SWIG_AsVal_dec(unsigned long long)(Tcl_Obj *obj, unsigned long long *val)
 {
   long v;
-  if (Tcl_GetLongFromObj(0,obj, &v) == TCL_OK) {
+  /* A negative v with no minus sign is an unsigned value too big for a long, as for unsigned long */
+  if (Tcl_GetLongFromObj(0,obj, &v) == TCL_OK && (v >= 0 || !strchr(Tcl_GetString(obj), '-'))) {
     if (val) *val = (unsigned long) v;
     return SWIG_OK;
   } else {
-    int len = 0;
+    Tcl_Size len = 0;
     const char *nptr = Tcl_GetStringFromObj(obj, &len);
     if (nptr && len > 0) {
       char *endptr;
       unsigned long long v;
-      if (*nptr == '-') return SWIG_OverflowError;
       errno = 0;
       v = strtoull(nptr, &endptr,0);
       if (nptr[0] == '\0' || *endptr != '\0')
 	return SWIG_TypeError;
-      if (v == ULLONG_MAX && errno == ERANGE) {
+      if ((v == ULLONG_MAX && errno == ERANGE) || (v != 0 && strchr(nptr, '-'))) {
 	errno = 0;
 	return SWIG_OverflowError;
       } else {

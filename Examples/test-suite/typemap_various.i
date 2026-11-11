@@ -54,14 +54,22 @@ void CheckRetTypemapUsed() {
 %}
 
 %newobject FFoo::Bar(bool) const ;
-%typemap(newfree) char* Bar(bool)  {
+%typemap(newfree) char* Bar(bool) {
    /* hello */ delete[] result;
 }
+
+%{
+#include <string.h>
+%}
 
 %inline {
   class FFoo {
   public:
-    char * Bar(bool b) const { return (char *)"x"; }
+    char * Bar(bool b) const {
+      char *ret = new char[2];
+      strcpy(ret, b ? "1" : "0");
+      return ret;
+    }
   };
 }
 
@@ -86,4 +94,14 @@ struct ABCD {
   double y_() { return 0.0; }
   double _3() { return 0.0; }
 };
+%}
+
+// noblock=0 keeps the braces, so the variable declared in the typemap does not clash between the two parameters
+%typemap(check, noblock=0) NoBlockZero {
+  int noblock_zero_value = $1;
+  (void)noblock_zero_value;
+}
+%inline %{
+typedef int NoBlockZero;
+void noblock_zero(NoBlockZero a, NoBlockZero b) {}
 %}

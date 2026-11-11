@@ -28,4 +28,9 @@ func main() {
 	if x != "Grok::blah" {
 		panic(x)
 	}
+
+	x = d.Far1()
+	if x != "Spam::far1" {
+		panic(x)
+	}
 }

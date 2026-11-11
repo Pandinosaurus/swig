@@ -18,9 +18,13 @@
 %{
 #define TESTCASE_THROW1(T1)
 #define TESTCASE_THROW2(T1, T2)
+#include <string.h>
 %}
 
 %include <std_string.i>
+#if defined SWIGOCTAVE || defined SWIGPYTHON
+%implicitconv WrapPtr;
+#endif
 
 %inline %{
   #include <string>
@@ -71,8 +75,8 @@
   class EnumClass {
     public:
       enum speed { FAST, SLOW };
-      // Note: default values should be EnumClass::FAST and SWEET 
-      bool blah(speed s = FAST, flavor f = SWEET) { return (s == FAST && f == SWEET); };
+      // Note: default values should be EnumClass::FAST and SWEET
+      bool blah(speed s = FAST, flavor f = SWEET) { return (s == FAST && f == SWEET); }
   };
 
   // using base class enum in a derived class
@@ -81,18 +85,34 @@
     void accelerate(speed s = SLOW) { }
   };
 
+  // NULL and nullptr (#3472)
+  struct opaque;
+  class WrapPtr {
+  public:
+    WrapPtr(opaque*) {}
+  };
+  void wrapptr_0(int x, WrapPtr w = 0) { (void)x; (void)w; }
+  void wrapptr_0l(int x, WrapPtr w = 0L) { (void)x; (void)w; }
+  void wrapptr_null(int x, WrapPtr w = NULL) { (void)x; (void)w; }
+  // Show SWIG nullptr, but give compiler C++98 code.
+#ifdef SWIG
+  void wrapptr_nullptr(int x, WrapPtr w = nullptr) { (void)x; (void)w; }
+#else
+  void wrapptr_nullptr(int x, WrapPtr w = NULL) { (void)x; (void)w; }
+#endif
+
   // casts
   const char * casts1(const char *m = (const char *) NULL) {
-    char *ret = NULL; 
-    if (m) { 
+    char *ret = NULL;
+    if (m) {
       ret = new char[strlen(m)+1];
       strcpy(ret, m);
     }
     return ret;
   }
   const char * casts2(const char *m = (const char *) "Hello") {
-    char *ret = NULL; 
-    if (m) { 
+    char *ret = NULL;
+    if (m) {
       ret = new char[strlen(m)+1];
       strcpy(ret, m);
     }
@@ -108,16 +128,16 @@
   char chartest6(char c = '\x43') { return c; } // 'C'
 
   // namespaces
-  namespace AType { 
-    enum AType { NoType }; 
-  } 
+  namespace AType {
+    enum AType { NoType };
+  }
   void dummy(AType::AType aType = AType::NoType) {}
-  namespace A { 
-    namespace B { 
-      int CONST_NUM = 10; 
-    } 
+  namespace A {
+    namespace B {
+      int CONST_NUM = 10;
+    }
     int afunction(int i = B::CONST_NUM) { return i; }
-  } 
+  }
 
   // references
   int reftest1(const int &x = 42) { return x; }
@@ -131,7 +151,7 @@
       void test(int x = Oak + Fir + Cedar) {}
   };
   enum Tree::types chops(enum Tree::types type) { return type; }
- 
+
 %}
 
 // Rename a class member
@@ -143,7 +163,7 @@
 %rename(renamed2arg) Foo::renameme(int x) const;
 %rename(renamed1arg) Foo::renameme() const;
 
-%typemap(default) double* null_by_default "$1=0;";
+%typemap(default) double* null_by_default "$1=0;"
 
 %inline %{
   typedef void* MyHandle;
@@ -155,11 +175,11 @@
       static int spam;
 
       Foo(){}
-     
+
       Foo(int x, int y = 0, int z = 0){}
 
       void meth(int x, int y = 0, int z = 0){}
-    
+
       // Use a renamed member as a default argument.  SWIG has to resolve
       // bar to Foo::bar and not Foo::spam.  SWIG-1.3.11 got this wrong.
       // (Different default parameter wrapping in SWIG-1.3.23 ensures SWIG doesn't have to resolve these symbols).
@@ -189,20 +209,20 @@
 // tests valuewrapper
 %feature("compactdefaultargs") MyClass2::set;
 %inline %{
-  enum MyType { Val1, Val2 }; 
+  enum MyType { Val1, Val2 };
 
-  class MyClass1 
-  { 
-    public: 
+  class MyClass1
+  {
+    public:
       MyClass1(MyType myType) {}
-  }; 
+  };
 
-  class MyClass2 
-  { 
-    public : 
+  class MyClass2
+  {
+    public :
       void set(MyClass1 cl1 = Val1) {}
-      // This could have been written : set(MyClass1 cl1 = MyClass1(Val1)) 
-      // But it works in C++ since there is a "conversion" constructor in  MyClass1. 
+      // This could have been written : set(MyClass1 cl1 = MyClass1(Val1))
+      // But it works in C++ since there is a "conversion" constructor in  MyClass1.
       void set2(MyClass1 cl1 = Val1) {}
   };
 %}
@@ -228,7 +248,7 @@ struct Except {
 %}
 
 // Default parameters in static class methods
-#ifdef SWIGPYTHON
+#if defined(SWIGPYTHON) || defined(SWIGJAVASCRIPT)
 %rename(staticMethod) staticmethod;
 #endif
 
@@ -281,7 +301,7 @@ struct ConstMethods {
 };
 %}
 
-// const methods 
+// const methods
 // runtime test needed to check that the const method is called
 struct ConstMethods {
   int coo(double d = 0.0) const;
@@ -305,8 +325,8 @@ struct ConstMethods {
       return(x+p);
     }
 
-    typedef struct Pointf { 
-      double		x,y; 
+    typedef struct Pointf {
+      double		x,y;
     } Pointf;
   }
 %}
@@ -322,6 +342,10 @@ struct ConstMethods {
 
 %inline %{
   inline int slightly_off_square(int square_error, int def17) { return def17*def17 + square_error; }
+  struct Q {
+    static int slightly_off_square_static(int def17) { return def17*def17 + 2; }
+    int slightly_off_square(int def17) { return def17*def17 + 2; }
+  };
 %}
 
 // Python C default args
@@ -333,3 +357,88 @@ struct CDA {
 };
 %}
 
+// Regression test for https://sourceforge.net/p/swig/bugs/325/
+%include wchar.i
+%inline %{
+int archiving_on( char * archivpath, char * chmodstr = (char *)"ug+rw" ) {
+  return archivpath && chmodstr[0] == 'u';
+}
+
+// Wide character version
+#include <wchar.h>
+int archiving_onw( wchar_t * archivpath, wchar_t * chmodstr = (wchar_t *)L"ug+rw" ) {
+  return archivpath && chmodstr[0] == 'u';
+}
+%}
+
+%{
+struct SomeClass {
+  int d(int x) const { return x; }
+};
+static SomeClass someobject;
+%}
+%inline %{
+// Regression test - SWIG >= 4.3.0 avoids parsing parameter lists of method
+// calls and instead just skips from `(` to the matching closing `)`.  That
+// means SWIG can now handle any expression in a method call parameter list.
+int nasty_default_expression(int x = someobject.d(sizeof - sizeof 1)) { return x; }
+%}
+
+%inline %{
+// Regression test - SWIG >= 4.3.0 avoids parsing subscript expressions and instead
+// just skips from `[` to the matching closing `]`.  That
+// means SWIG can now handle any expression as the subscript.
+int subscripted_default_arg(int x = "abcdefghij"[sizeof - sizeof 1]) { return x; }
+%}
+
+%{
+static const int count_array[] = {1, 2, 3, 4, 5};
+%}
+%feature("compactdefaultargs") new_subscript_default_arg;
+%inline %{
+// A subscript after 'sizeof(...)' is part of its operand, as in the array count idiom.
+int sizeof_subscript_default_arg(int n = sizeof(count_array) / sizeof(count_array)[0]) { return n; }
+const int sizeof_subscript_count = sizeof (count_array) / sizeof (count_array)[0];
+int number_subscript_default_arg(int x = 2[count_array]) { return x; }
+// The ']' of the subscript is followed by the ']' of the array bound, which compactdefaultargs puts in the wrapper.
+int new_subscript_default_arg(int *p = new int[count_array[1]]) { delete [] p; return count_array[1]; }
+%}
+
+%{
+struct SizeofMember {
+  char c[3];
+};
+static SizeofMember sizeof_member_object;
+static SizeofMember *sizeof_member_pointer = &sizeof_member_object;
+%}
+%inline %{
+// sizeof applied to a member access of a parenthesised operand, as in 'sizeof ((x).m)'
+const unsigned long sizeof_member_constant = sizeof (sizeof_member_object).c + sizeof (sizeof_member_pointer)->c;
+unsigned long sizeof_member_default(unsigned long x = sizeof (sizeof_member_object).c, unsigned long y = sizeof (sizeof_member_pointer)->c) { return x + y; }
+unsigned long sizeof_member_size() { return sizeof(sizeof_member_object.c); }
+%}
+
+%{
+struct SizeofChainInner {
+  char c[5];
+};
+struct SizeofChainMiddle {
+  SizeofChainInner inner;
+  SizeofChainInner *pinner;
+};
+struct SizeofChainOuter {
+  SizeofChainMiddle middle;
+  SizeofChainMiddle *pmiddle;
+};
+static SizeofChainOuter sizeof_chain_object;
+static SizeofChainOuter *sizeof_chain_pointer = &sizeof_chain_object;
+%}
+%inline %{
+// sizeof applied to any number of '.' or '->' member accesses of a parenthesised operand
+bool sizeof_member_chain(unsigned long x = sizeof (sizeof_chain_object).middle.inner.c,
+                         unsigned long y = sizeof (sizeof_chain_pointer)->pmiddle->pinner->c,
+                         unsigned long z = sizeof (sizeof_chain_object).pmiddle->inner.c) {
+  const unsigned long expected = sizeof(sizeof_chain_object.middle.inner.c);
+  return x == expected && y == expected && z == expected;
+}
+%}

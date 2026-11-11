@@ -4,6 +4,7 @@
  *   - $jslocals:         locals part of wrapper
  *   - $jscode:           code part of wrapper
  *   - $jsargcount:       number of arguments
+ *   - $jsargrequired:    required number of arguments
  *   - $jsmangledtype:    mangled type of class
  * ----------------------------------------------------------------------------- */
 
@@ -11,10 +12,10 @@
 static SwigV8ReturnValue $jswrapper(const SwigV8Arguments &args) {
   SWIGV8_HANDLESCOPE();
 
-  SWIGV8_OBJECT self = args.Holder();
+  SWIGV8_OBJECT self = SWIGV8_ARGS_THIS(args);
   $jslocals
   if(self->InternalFieldCount() < 1) SWIG_exception_fail(SWIG_ERROR, "Illegal call of constructor $jswrapper.");
-  if(args.Length() != $jsargcount) SWIG_exception_fail(SWIG_ERROR, "Illegal number of arguments for $jswrapper.");
+  if(args.Length() < $jsargrequired || args.Length() > $jsargcount) SWIG_exception_fail(SWIG_ERROR, "Illegal number of arguments for $jswrapper.");
   $jscode
 
   SWIGV8_SetPrivateData(self, result, SWIGTYPE_$jsmangledtype, SWIG_POINTER_OWN);
@@ -73,16 +74,17 @@ fail:
  *   - $jslocals:         locals part of wrapper
  *   - $jscode:           code part of wrapper
  *   - $jsargcount:       number of arguments
+ *   - $jsargrequired:    required number of arguments
  *   - $jsmangledtype:    mangled type of class
  * ----------------------------------------------------------------------------- */
 %fragment("js_overloaded_ctor", "templates") %{
 static SwigV8ReturnValue $jswrapper(const SwigV8Arguments &args, V8ErrorHandler &SWIGV8_ErrorHandler) {
   SWIGV8_HANDLESCOPE();
 
-  SWIGV8_OBJECT self = args.Holder();
+  SWIGV8_OBJECT self = SWIGV8_ARGS_THIS(args);
   $jslocals
   if(self->InternalFieldCount() < 1) SWIG_exception_fail(SWIG_ERROR, "Illegal call of constructor $jswrapper.");
-  if(args.Length() != $jsargcount) SWIG_exception_fail(SWIG_ERROR, "Illegal number of arguments for $jswrapper.");
+  if(args.Length() < $jsargrequired || args.Length() > $jsargcount) SWIG_exception_fail(SWIG_ERROR, "Illegal number of arguments for $jswrapper.");
   $jscode
 
   SWIGV8_SetPrivateData(self, result, SWIGTYPE_$jsmangledtype, SWIG_POINTER_OWN);
@@ -97,25 +99,19 @@ fail:
 /* -----------------------------------------------------------------------------
  * js_ctor_dispatch_case:  template for a dispatch case for calling an overloaded ctor.
  *   - $jsargcount:       number of arguments of called ctor
+ *   - $jsargrequired:    required number of arguments
  *   - $jswrapper:        wrapper of called ctor
  *
  *  Note: a try-catch-like mechanism is used to switch cases
  * ----------------------------------------------------------------------------- */
 %fragment ("js_ctor_dispatch_case", "templates")
 %{
-  if(args.Length() == $jsargcount) {
+  if(args.Length() >= $jsargrequired && args.Length() <= $jsargcount) {
     errorHandler.err.Clear();
-#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031903)
-    self = $jswrapper(args, errorHandler);
-    if(errorHandler.err.IsEmpty()) {
-      SWIGV8_ESCAPE(self);
-    }
-#else
     $jswrapper(args, errorHandler);
     if(errorHandler.err.IsEmpty()) {
       return;
     }
-#endif
   }
 %}
 
@@ -127,22 +123,8 @@ fail:
 %fragment ("js_dtor", "templates")
 %{
 
-#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031710)
-static void $jswrapper(v8::Persistent< v8::Value > object, void *parameter) {
-  SWIGV8_Proxy *proxy = static_cast<SWIGV8_Proxy *>(parameter);
-#elif (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031900)
-static void $jswrapper(v8::Isolate *isolate, v8::Persistent<v8::Value> object, void *parameter) {
-  SWIGV8_Proxy *proxy = static_cast<SWIGV8_Proxy *>(parameter);
-#elif (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < SWIGV8_SETWEAK_VERSION)
-static void $jswrapper(v8::Isolate *isolate, v8::Persistent<v8::Object> *object, SWIGV8_Proxy *proxy) {
-#elif (V8_MAJOR_VERSION-0) < 5
-static void $jswrapper(const v8::WeakCallbackData<v8::Object, SWIGV8_Proxy> &data) {
-  v8::Local<v8::Object> object = data.GetValue();
+static void $jswrapper(const v8::WeakCallbackInfo<SWIGV8_Proxy> &data) {
   SWIGV8_Proxy *proxy = data.GetParameter();
-#else
-  static void $jswrapper(const v8::WeakCallbackInfo<SWIGV8_Proxy> &data) {
-  SWIGV8_Proxy *proxy = data.GetParameter();
-#endif
 
   if(proxy->swigCMemOwn && proxy->swigCObject) {
 #ifdef SWIGRUNTIME_DEBUG
@@ -151,20 +133,6 @@ static void $jswrapper(const v8::WeakCallbackData<v8::Object, SWIGV8_Proxy> &dat
     $jsfree proxy->swigCObject;
   }
   delete proxy;
-
-#if (V8_MAJOR_VERSION-0) < 5
-  object.Clear();
-#endif
-  
-#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031710)
-  object.Dispose();
-#elif (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031900)
-  object.Dispose(isolate);
-#elif (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x032100)
-  object->Dispose(isolate);
-#elif (V8_MAJOR_VERSION-0) < 5
-  object->Dispose();
-#endif
 }
 %}
 
@@ -176,40 +144,14 @@ static void $jswrapper(const v8::WeakCallbackData<v8::Object, SWIGV8_Proxy> &dat
  * ----------------------------------------------------------------------------- */
 %fragment ("js_dtoroverride", "templates")
 %{
-#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031710)
-static void $jswrapper(v8::Persistent<v8::Value> object, void *parameter) {
-  SWIGV8_Proxy *proxy = static_cast<SWIGV8_Proxy *>(parameter);
-#elif (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031900)
-static void $jswrapper(v8::Isolate *isolate, v8::Persistent<v8::Value> object, void *parameter) {
-  SWIGV8_Proxy *proxy = static_cast<SWIGV8_Proxy *>(parameter);
-#elif (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < SWIGV8_SETWEAK_VERSION)
-static void $jswrapper(v8::Isolate *isolate, v8::Persistent< v8::Object> *object, SWIGV8_Proxy *proxy) {
-#elif (V8_MAJOR_VERSION-0) < 5
-static void $jswrapper(const v8::WeakCallbackData<v8::Object, SWIGV8_Proxy> &data) {
-  v8::Local<v8::Object> object = data.GetValue();
-  SWIGV8_Proxy *proxy = data.GetParameter();
-#else
 static void $jswrapper(const v8::WeakCallbackInfo<SWIGV8_Proxy> &data) {
   SWIGV8_Proxy *proxy = data.GetParameter();
-#endif
 
   if(proxy->swigCMemOwn && proxy->swigCObject) {
     $jstype arg1 = ($jstype)proxy->swigCObject;
     ${destructor_action}
   }
   delete proxy;
-
-#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031710)
-  object.Dispose();
-#elif (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031900)
-  object.Dispose(isolate);
-#elif (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x032100)
-  object->Dispose(isolate);
-#elif (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < SWIGV8_SETWEAK_VERSION)
-  object->Dispose();
-#elif (V8_MAJOR_VERSION-0) < 5
-  object.Clear();
-#endif
 }
 %}
 
@@ -221,11 +163,7 @@ static void $jswrapper(const v8::WeakCallbackInfo<SWIGV8_Proxy> &data) {
  * ----------------------------------------------------------------------------- */
 %fragment("js_getter", "templates")
 %{
-#if (V8_MAJOR_VERSION-0) < 5
-static SwigV8ReturnValue $jswrapper(v8::Local<v8::String> property, const SwigV8PropertyCallbackInfo &info) {
-#else
 static SwigV8ReturnValue $jswrapper(v8::Local<v8::Name> property, const SwigV8PropertyCallbackInfo &info) {
-#endif
   SWIGV8_HANDLESCOPE();
   
   SWIGV8_VALUE jsresult;
@@ -247,11 +185,7 @@ fail:
  * ----------------------------------------------------------------------------- */
 %fragment("js_setter", "templates")
 %{
-#if (V8_MAJOR_VERSION-0) < 5
-static void $jswrapper(v8::Local<v8::String> property, v8::Local<v8::Value> value, const SwigV8PropertyCallbackInfoVoid &info) {
-#else
 static void $jswrapper(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const SwigV8PropertyCallbackInfoVoid &info) {
-#endif
   SWIGV8_HANDLESCOPE();
   
   $jslocals
@@ -264,9 +198,11 @@ fail:
 
 /* -----------------------------------------------------------------------------
  * js_function:  template for function wrappers
- *   - $jswrapper:  wrapper function name
- *   - $jslocals:   locals part of wrapper
- *   - $jscode:     code part of wrapper
+ *   - $jswrapper:        wrapper function name
+ *   - $jslocals:         locals part of wrapper
+ *   - $jscode:           code part of wrapper
+ *   - $jsargcount:       number of arguments
+ *   - $jsargrequired:    required number of arguments
  * ----------------------------------------------------------------------------- */
 %fragment("js_function", "templates")
 %{
@@ -275,7 +211,7 @@ static SwigV8ReturnValue $jswrapper(const SwigV8Arguments &args) {
   
   SWIGV8_VALUE jsresult;
   $jslocals
-  if(args.Length() != $jsargcount) SWIG_exception_fail(SWIG_ERROR, "Illegal number of arguments for $jswrapper.");
+  if (args.Length() < $jsargrequired || args.Length() > $jsargcount) SWIG_exception_fail(SWIG_ERROR, "Illegal number of arguments for $jswrapper.");
 
   $jscode
   SWIGV8_RETURN(jsresult);
@@ -335,28 +271,29 @@ fail:
 
 /* -----------------------------------------------------------------------------
  * js_function_dispatch_case:  template for a case used in the function dispatcher
- *   - $jswrapper:  wrapper function name
- *   - $jsargcount: number of arguments of overloaded function
- *   - $jscode:     code part of wrapper
+ *   - $jswrapper:     wrapper function name
+ *   - $jsargcount:    number of arguments of overloaded function
+ *   - $jsargrequired: required number of arguments
+ *   - $jscode:        code part of wrapper
  * ----------------------------------------------------------------------------- */
 %fragment ("js_function_dispatch_case", "templates")
 %{
 
-  if(args.Length() == $jsargcount) {
+  if(args.Length() >= $jsargrequired && args.Length() <= $jsargcount) {
     errorHandler.err.Clear();
-#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031903)
-    jsresult = $jswrapper(args, errorHandler);
-    if(errorHandler.err.IsEmpty()) {
-      SWIGV8_ESCAPE(jsresult);
-    }
-#else
     $jswrapper(args, errorHandler);
     if(errorHandler.err.IsEmpty()) {
       return;
     }
-#endif
   }
 %}
+
+/* -----------------------------------------------------------------------------
+ * js_check_arg:  template for checking if an argument exists
+ *   - $jsarg: number of argument
+ * ----------------------------------------------------------------------------- */
+%fragment ("js_check_arg", "templates")
+%{if(args.Length() > $jsarg)%}
 
 /* -----------------------------------------------------------------------------
  * jsv8_declare_class_template:  template for a class template declaration.
@@ -394,15 +331,11 @@ fail:
 %{
   if (SWIGTYPE_p$jsbaseclass->clientdata && !(static_cast<SWIGV8_ClientData *>(SWIGTYPE_p$jsbaseclass->clientdata)->class_templ.IsEmpty()))
   {
-#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031903)
-    $jsmangledname_class->Inherit(static_cast<SWIGV8_ClientData *>(SWIGTYPE_p$jsbaseclass->clientdata)->class_templ);
-#else
     $jsmangledname_class->Inherit(
       v8::Local<v8::FunctionTemplate>::New(
         v8::Isolate::GetCurrent(),
         static_cast<SWIGV8_ClientData *>(SWIGTYPE_p$jsbaseclass->clientdata)->class_templ)
      );
-#endif
 
 #ifdef SWIGRUNTIME_DEBUG
     printf("Inheritance successful $jsmangledname $jsbaseclass\n");
@@ -425,15 +358,7 @@ fail:
   SWIGV8_FUNCTION_TEMPLATE $jsmangledname_class_0 = SWIGV8_CreateClassTemplate("$jsname");
   $jsmangledname_class_0->SetCallHandler($jsctor);
   $jsmangledname_class_0->Inherit($jsmangledname_class);
-#if (V8_MAJOR_VERSION-0) < 4 && (SWIG_V8_VERSION < 0x031903)
-  $jsmangledname_class_0->SetHiddenPrototype(true);
-  v8::Handle<v8::Object> $jsmangledname_obj = $jsmangledname_class_0->GetFunction();
-#elif (SWIG_V8_VERSION < 0x0704)
-  $jsmangledname_class_0->SetHiddenPrototype(true);
-  v8::Local<v8::Object> $jsmangledname_obj = $jsmangledname_class_0->GetFunction();
-#else
   v8::Local<v8::Object> $jsmangledname_obj = $jsmangledname_class_0->GetFunction(context).ToLocalChecked();
-#endif
 %}
 
 /* -----------------------------------------------------------------------------
@@ -444,12 +369,7 @@ fail:
  * ----------------------------------------------------------------------------- */
 %fragment("jsv8_register_class", "templates")
 %{
-#if (V8_MAJOR_VERSION-0) < 5
-  $jsparent_obj->Set(SWIGV8_SYMBOL_NEW("$jsname"), $jsmangledname_obj);
-#else
   SWIGV8_MAYBE_CHECK($jsparent_obj->Set(context, SWIGV8_SYMBOL_NEW("$jsname"), $jsmangledname_obj));
-#endif
-
 %}
 
 /* -----------------------------------------------------------------------------
@@ -469,11 +389,7 @@ fail:
  * ----------------------------------------------------------------------------- */
 %fragment("jsv8_register_namespace", "templates")
 %{
-#if (V8_MAJOR_VERSION-0) < 5
-  $jsparent_obj->Set(SWIGV8_SYMBOL_NEW("$jsname"), $jsmangledname_obj);
-#else
   SWIGV8_MAYBE_CHECK($jsparent_obj->Set(context, SWIGV8_SYMBOL_NEW("$jsname"), $jsmangledname_obj));
-#endif
 %}
 
 /* -----------------------------------------------------------------------------
